@@ -1,0 +1,7 @@
+{
+  "functions": {
+    "api/extract-map.py": {
+      "runtime": "python3.12"
+    }
+  }
+}
