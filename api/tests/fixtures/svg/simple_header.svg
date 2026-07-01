@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600">
+  <text x="100" y="50" font-size="16" font-weight="bold">screen_view</text>
+  <text x="120" y="80">sn=/napp/home</text>
+  <text x="120" y="100">ct=b2c_ecare_napp</text>
+  
+  <text x="100" y="150" font-size="16" font-weight="bold">interaction</text>
+  <text x="120" y="180">ac=screen_click_button</text>
+  <text x="120" y="200">lb=test_button</text>
+  <text x="120" y="220">sn=/napp/home</text>
+</svg>

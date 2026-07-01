@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600">
+  <text x="100" y="50" font-size="16" font-weight="bold">screen_view</text>
+  <text x="120" y="80">sn=/napp/home</text>
+  <text x="120" y="100">ct=b2c_ecare_napp</text>
+  <!-- Linha malformada sem fechamento -->
+  <text x="120" y="120">ac=screen_click_button
+  <text x="120" y="140">lb=test_button</text>
+</svg>

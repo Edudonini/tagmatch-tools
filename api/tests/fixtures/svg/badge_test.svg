@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600">
+  <circle cx="80" cy="50" r="15" fill="blue"/>
+  <text x="80" y="55" font-size="12" text-anchor="middle" fill="white">1</text>
+  <text x="100" y="50" font-size="16" font-weight="bold">screen_view</text>
+  <text x="120" y="80">sn=/napp/home</text>
+  
+  <circle cx="80" cy="150" r="15" fill="blue"/>
+  <text x="80" y="155" font-size="12" text-anchor="middle" fill="white">2</text>
+  <text x="100" y="150" font-size="16" font-weight="bold">interaction</text>
+  <text x="120" y="180">ac=screen_click_button</text>
+  <text x="120" y="200">lb=test_button</text>
+</svg>
