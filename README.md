@@ -10,35 +10,41 @@ https://tagmatch-tools.vercel.app
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+`tagmatch` (the core extraction library) lives in a **private** repo (`Edudonini/TagMatch`). You need a GitHub Personal Access Token with read access to it, configured via `~/.netrc`:
+
+```
+machine github.com
+login x-access-token
+password <your-PAT>
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Local development
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+This is a Next.js app with a Python (Flask) API function. Locally, without the Vercel CLI's Python emulation (`vercel dev` requires interactive OAuth login), run both processes separately:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+# Terminal 1: Python API
+python -m venv .venv
+source .venv/Scripts/activate  # .venv/bin/activate on macOS/Linux
+pip install -r requirements.txt
+flask --app api/extract-map.py run --port 5328
 
-## Learn More
+# Terminal 2: Next.js frontend
+npm install
+npm run dev
+```
 
-To learn more about Next.js, take a look at the following resources:
+Open [http://localhost:3000](http://localhost:3000). `next.config.ts` proxies `/api/extract-map` requests to `http://127.0.0.1:5328` when `NODE_ENV=development`, so the frontend talks to the local Flask process transparently.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### Running tests
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+source .venv/Scripts/activate
+python -m pytest api/tests/ -v
+```
 
-## Deploy on Vercel
+### Deployment
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Deployed via `vercel --prod`. Production needs the same private-repo credential as local dev, provided via Vercel Environment Variables (Production + Preview scopes): `GIT_CONFIG_COUNT=1`, `GIT_CONFIG_KEY_0` (contains the PAT, marked Sensitive), `GIT_CONFIG_VALUE_0` — this rewrites `https://github.com/...` git URLs to include the credential during the build only.
