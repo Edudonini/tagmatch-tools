@@ -68,3 +68,18 @@ def test_extract_invalid_mode_returns_error():
     result = extract_map(_read("simple_header.svg"), mode="bogus")
     assert result["ok"] is False
     assert "error" in result
+
+
+def test_extract_card_mode_with_synthetic_cards():
+    result = extract_map(_read("card_test.svg"), mode="card")
+    assert result["ok"] is True
+    assert result["report"]["events_extracted"] == 2
+    assert result["report"]["cards_used"] == 2
+    spec = result["spec"]
+    assert len(spec) == 2
+    assert spec[0]["name"] == "screen_view"
+    assert spec[0]["sn"] == "/napp/test-card"
+    assert spec[0]["ct"] == "b2c_ecare_napp"
+    assert spec[1]["name"] == "interaction"
+    assert spec[1]["ac"] == "screen_click_button"
+    assert spec[1]["lb"] == "test_button"

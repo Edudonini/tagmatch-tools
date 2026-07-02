@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="800">
+  <rect x="60" y="30" width="500" height="140" fill="#d5e7f7"/>
+  <circle cx="80" cy="50" r="15" fill="blue"/>
+  <text x="80" y="55" font-size="12" text-anchor="middle" fill="white">1</text>
+  <text x="100" y="50" font-size="16" font-weight="bold">screen_view</text>
+  <text x="120" y="90">sn=/napp/test-card</text>
+  <text x="120" y="110">ct=b2c_ecare_napp</text>
+
+  <rect x="60" y="300" width="500" height="140" fill="#f6dade"/>
+  <circle cx="80" cy="320" r="15" fill="blue"/>
+  <text x="80" y="325" font-size="12" text-anchor="middle" fill="white">2</text>
+  <text x="100" y="320" font-size="16" font-weight="bold">interaction</text>
+  <text x="120" y="360">ac=screen_click_button</text>
+  <text x="120" y="380">lb=test_button</text>
+</svg>
