@@ -20,10 +20,18 @@ export default function ExtractMapPage() {
     const formData = new FormData();
     formData.append("file", file);
     formData.append("mode", mode);
-    const res = await fetch("/api/extract-map", { method: "POST", body: formData });
-    const data: ExtractResult = await res.json();
-    setResult(data);
-    setLoading(false);
+    try {
+      const res = await fetch("/api/extract-map", { method: "POST", body: formData });
+      const data: ExtractResult = await res.json();
+      setResult(data);
+    } catch (err) {
+      setResult({
+        ok: false,
+        error: err instanceof Error ? err.message : "Request failed. Please try again.",
+      });
+    } finally {
+      setLoading(false);
+    }
   }
 
   function download(format: "json" | "csv") {
