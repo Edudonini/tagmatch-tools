@@ -44,3 +44,6 @@ next-env.d.ts
 .venv/
 __pycache__/
 *.pyc
+
+# subagent-driven-development scratch (briefs, reports, diffs, ledger)
+.superpowers/
