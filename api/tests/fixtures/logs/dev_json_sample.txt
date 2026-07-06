@@ -1,0 +1,84 @@
+{
+    "screenName": "/test/screen",
+    "params": {
+        "event_cnpj": "12345678901234",
+        "info_detail": "test_detail"
+    }
+}
+
+{
+    "action": "screen_click_button",
+    "name": "interaction",
+    "label": "test_button_click",
+    "screenName": "/test/screen",
+    "category": "test_category",
+    "component_copy": "test_button",
+    "component_type": "button",
+    "additionalEventFields": [
+        {
+            "key": "event_cnpj",
+            "value": "98765432109876"
+        },
+        {
+            "key": "info_detail",
+            "value": "overridden_detail"
+        },
+        {
+            "key": "tag_label",
+            "value": "test_tag"
+        },
+        {
+            "key": "module_name",
+            "value": "test_module"
+        },
+        {
+            "key": "description",
+            "value": "test_description"
+        },
+        {
+            "key": "value",
+            "value": "100"
+        }
+    ]
+}
+
+{
+    "action": "screen_view_info",
+    "name": "noninteraction",
+    "label": "test_screen_view",
+    "screenName": "/test/screen2",
+    "category": "test_category2",
+    "additionalEventFields": [
+        {
+            "key": "description",
+            "value": "noninteraction_description"
+        },
+        {
+            "key": "value",
+            "value": "200"
+        }
+    ]
+}
+
+{
+    "screenName": "/test/screen3",
+    "event_cnpj": "direct_cnpj_value"
+}
+
+{
+    "action": "screen_click_link",
+    "name": "interaction",
+    "label": "test_link_click",
+    "screenName": "/test/screen3",
+    "category": "test_category3"
+}
+
+
+
+
+
+
+
+
+
+
