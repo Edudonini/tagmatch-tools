@@ -9,6 +9,7 @@ https://tagmatch-tools.vercel.app
 - `/extract-map` — extract a TagMatch spec from a Whimsical SVG export, with an optional event-by-event review mode (visual crop preview, edit/delete/add).
 - `/extract-logs` — parse and merge Logcat/NDJSON/Dev JSON/Firebase log files into one deduplicated events table.
 - `/build-query` — generate Databricks SQL (validation, volumetry, funnel, custom) from an extracted spec.
+- `/match` — compare an extracted spec against extracted logs (coverage, confidence, per-event divergences, unmatched logs).
 
 ## Getting Started
 
