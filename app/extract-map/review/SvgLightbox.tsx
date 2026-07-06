@@ -17,6 +17,11 @@ export function SvgLightbox({ parsedRoot, bbox, padding, onClose }: SvgLightboxP
     const container = containerRef.current;
     if (!container) return;
 
+    // Live-DOM injection of user-supplied SVG: inline event handlers in the
+    // SVG can execute here (unlike the <img>-blob crop previews, which are
+    // script-restricted). Safe only because this is a no-auth, single-user
+    // tool rendering the user's own upload - do not reuse this component in
+    // a multi-user context without sanitizing the SVG first.
     const clone = parsedRoot.cloneNode(true) as SVGSVGElement;
     const x = bbox.x1 - padding;
     const y = bbox.y1 - padding;

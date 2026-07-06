@@ -84,9 +84,14 @@ export function EventReviewCard({ event, svgContent, parsedRoot, onUpdate }: Eve
 
   function renameField(oldKey: string, newKey: string) {
     if (!newKey || newKey === oldKey) return;
+    // Renaming onto an existing key would silently drop one of the two values.
+    if (newKey in event) return;
+    const oldRegexKey = `${oldKey}_regex`;
     const next: ReviewRow = {};
     for (const [k, v] of Object.entries(event)) {
-      next[k === oldKey ? newKey : k] = v;
+      if (k === oldKey) next[newKey] = v;
+      else if (k === oldRegexKey) next[`${newKey}_regex`] = v;
+      else next[k] = v;
     }
     // Carry the "stay visible while empty" flag over to the new key, or a
     // freshly-renamed blank field (e.g. right after "+ Add field") would
