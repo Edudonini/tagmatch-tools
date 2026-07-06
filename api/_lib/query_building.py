@@ -28,6 +28,10 @@ _IDENTIFIER_RE = re.compile(r"^[A-Za-z0-9_]+$")
 # platform frontend's FILTER_FIELDS (CustomQueryPanel.tsx:49). Anything
 # else would fall through the builder's mapping .get(field, field)
 # fallbacks and land in SQL as a raw identifier.
+# KEEP IN SYNC with FILTER_FIELDS in app/build-query/CustomOptions.tsx -
+# the two lists are hand-maintained; this one is the security gate (a
+# field here that the UI omits just hides an option; a field the UI adds
+# but this omits fails generation with "Invalid filter field").
 VALID_FILTER_FIELDS = (
     "sn", "ct", "ac", "lb",
     "component_copy", "component_type", "module_name", "item_name", "item_id",

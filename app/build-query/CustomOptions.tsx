@@ -9,6 +9,9 @@ export type CustomOptionsState = {
 };
 
 // Mirrors the platform's CustomQueryPanel constants (CustomQueryPanel.tsx:35-49).
+// KEEP IN SYNC with VALID_FILTER_FIELDS in api/_lib/query_building.py -
+// that list is the server-side security gate; a field added here but not
+// there will fail generation with "Invalid filter field".
 export const FILTER_FIELDS = [
   "sn", "ct", "ac", "lb",
   "component_copy", "component_type", "module_name", "item_name", "item_id",
