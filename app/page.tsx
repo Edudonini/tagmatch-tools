@@ -9,11 +9,11 @@ const TOOLS = [
     available: true,
   },
   {
-    href: "#",
+    href: "/build-query",
     glyph: "QB",
     name: "Query Builder",
-    desc: "Generate matching queries from a spec — coming soon.",
-    available: false,
+    desc: "Generate Databricks SQL (validation, volumetry, funnel, custom) from a spec.",
+    available: true,
   },
   {
     href: "/extract-logs",
