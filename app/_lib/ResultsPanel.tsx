@@ -10,6 +10,7 @@ export type ResultsPanelProps = {
   entityLabel: string;
   badgeColumn: string;
   downloadBaseName: string;
+  onRowClick?: (row: ResultRow) => void;
 };
 
 export function badgeClass(name: unknown): string {
@@ -58,7 +59,7 @@ function triggerDownload(rows: ResultRow[], columns: string[], format: "json" | 
   URL.revokeObjectURL(url);
 }
 
-export function ResultsPanel({ rows, report, entityLabel, badgeColumn, downloadBaseName }: ResultsPanelProps) {
+export function ResultsPanel({ rows, report, entityLabel, badgeColumn, downloadBaseName, onRowClick }: ResultsPanelProps) {
   const [showAllColumns, setShowAllColumns] = useState(false);
 
   const allColumns = Array.from(
@@ -134,7 +135,11 @@ export function ResultsPanel({ rows, report, entityLabel, badgeColumn, downloadB
           </thead>
           <tbody>
             {rows.map((row, i) => (
-              <tr key={i}>
+              <tr
+                key={i}
+                className={onRowClick ? "row-clickable" : undefined}
+                onClick={onRowClick ? () => onRowClick(row) : undefined}
+              >
                 {columns.map((c) => (
                   <td key={c}>
                     {c === badgeCol ? (

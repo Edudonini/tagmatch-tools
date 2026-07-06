@@ -16,6 +16,13 @@ const TOOLS = [
     available: true,
   },
   {
+    href: "/match",
+    glyph: "MT",
+    name: "Matching",
+    desc: "Compare an extracted spec against extracted logs — coverage, confidence, divergences.",
+    available: true,
+  },
+  {
     href: "/extract-logs",
     glyph: "LX",
     name: "Log Extraction",
