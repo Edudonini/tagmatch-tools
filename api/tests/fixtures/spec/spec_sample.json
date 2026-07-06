@@ -1,0 +1,4 @@
+[
+  {"spec_id": "aaa111", "name": "screen_view", "event_order": 1, "sn": "/napp/test-card", "ct": "b2c_ecare_napp", "ac": "", "lb": ""},
+  {"spec_id": "bbb222", "name": "interaction", "event_order": 2, "sn": "", "ct": "b2c_ecare_napp", "ac": "screen_click_button", "lb": "test_button"}
+]
