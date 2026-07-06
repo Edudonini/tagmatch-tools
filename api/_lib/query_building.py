@@ -35,13 +35,20 @@ VALID_FILTER_FIELDS = (
 
 
 def _validated_custom_inputs(options: dict):
-    output_columns = [str(c) for c in options.get("output_columns", [])]
+    raw_columns = options.get("output_columns", [])
+    if not isinstance(raw_columns, list):
+        raise ValueError("output_columns must be a list.")
+    output_columns = [str(c) for c in raw_columns]
     for col in output_columns:
         if not _IDENTIFIER_RE.match(col):
             raise ValueError(f"Invalid output column: '{col}'.")
     filter_fields = options.get("filter_fields_per_event", {})
+    if not isinstance(filter_fields, dict):
+        raise ValueError("filter_fields_per_event must be an object.")
     validated_filters = {}
-    for order, fields in dict(filter_fields).items():
+    for order, fields in filter_fields.items():
+        if not isinstance(fields, list):
+            raise ValueError("Each filter_fields_per_event value must be a list.")
         clean = [str(f) for f in fields]
         for f in clean:
             if f not in VALID_FILTER_FIELDS:
