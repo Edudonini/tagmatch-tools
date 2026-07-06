@@ -1,10 +1,27 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 
 type ExtractResult =
   | { ok: true; spec: Record<string, unknown>[]; report: Record<string, unknown> }
   | { ok: false; error: string };
+
+function badgeClass(name: unknown): string {
+  const v = String(name ?? "").toLowerCase();
+  if (v === "screen_view") return "badge-sv";
+  if (v === "interaction") return "badge-int";
+  if (v === "noninteraction") return "badge-nonint";
+  return "badge-other";
+}
+
+function badgeLabel(name: unknown): string {
+  const v = String(name ?? "").toLowerCase();
+  if (v === "screen_view") return "SV";
+  if (v === "interaction") return "INT";
+  if (v === "noninteraction") return "NON";
+  return v ? v.slice(0, 3).toUpperCase() : "—";
+}
 
 export default function ExtractMapPage() {
   const [file, setFile] = useState<File | null>(null);
@@ -72,60 +89,111 @@ export default function ExtractMapPage() {
   }
 
   const columns = result && result.ok && result.spec.length > 0 ? Object.keys(result.spec[0]) : [];
+  const nameCol = columns.find((c) => c.toLowerCase() === "name");
+
+  const reportEntries = result && result.ok ? Object.entries(result.report) : [];
+  const scalarStats = reportEntries.filter(
+    ([, v]) => v === null || ["string", "number", "boolean"].includes(typeof v)
+  );
+  const nestedReport = Object.fromEntries(reportEntries.filter(([k]) => !scalarStats.some(([sk]) => sk === k)));
 
   return (
-    <main style={{ padding: 24, fontFamily: "sans-serif" }}>
+    <main className="shell">
+      <Link href="/" className="back-link">
+        ← All tools
+      </Link>
+      <div className="eyebrow">tagmatch / tools / extract-map</div>
       <h1>Map Extraction</h1>
-      <p>Upload a Whimsical SVG export to extract the TagMatch event spec.</p>
+      <p className="lede">
+        Upload a Whimsical SVG export. It comes back as a structured event
+        spec — same fields TagMatch uses to match logs.
+      </p>
 
-      <form onSubmit={handleSubmit}>
-        <input
-          type="file"
-          accept=".svg"
-          onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-        />
-        <select value={mode} onChange={(e) => setMode(e.target.value)}>
-          <option value="card">card (default, matches production)</option>
+      <form onSubmit={handleSubmit} className="panel control-panel">
+        <label className="file-input-label">
+          <input
+            type="file"
+            accept=".svg"
+            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+          />
+          Choose file
+        </label>
+        <span className="file-name">{file ? file.name : "No file chosen"}</span>
+        <select value={mode} onChange={(e) => setMode(e.target.value)} aria-label="Extraction mode">
+          <option value="card">card (default)</option>
           <option value="header">header</option>
           <option value="hybrid">hybrid</option>
         </select>
-        <button type="submit" disabled={!file || loading}>
-          {loading ? "Extracting..." : "Extract"}
+        <button type="submit" className="btn btn-primary" disabled={!file || loading}>
+          {loading ? "Extracting…" : "Extract →"}
         </button>
       </form>
 
       {result && !result.ok && (
-        <p style={{ color: "red" }}>Error: {result.error}</p>
+        <p className="alert-error">Couldn&apos;t extract a spec: {result.error}</p>
       )}
 
       {result && result.ok && (
         <>
-          <h2>Report</h2>
-          <pre>{JSON.stringify(result.report, null, 2)}</pre>
+          {scalarStats.length > 0 && (
+            <div className="stats">
+              {scalarStats.map(([key, value]) => (
+                <div className="stat" key={key}>
+                  <div className="stat-label">{key.replace(/_/g, " ")}</div>
+                  <div className="stat-value">{String(value)}</div>
+                </div>
+              ))}
+            </div>
+          )}
 
-          <h2>Spec ({result.spec.length} events)</h2>
-          <div>
-            <button onClick={() => download("json")}>Download JSON</button>
-            <button onClick={() => download("csv")}>Download CSV</button>
+          {Object.keys(nestedReport).length > 0 && (
+            <details className="report-details">
+              <summary>Full report</summary>
+              <pre>{JSON.stringify(nestedReport, null, 2)}</pre>
+            </details>
+          )}
+
+          <div className="results-header">
+            <h2>Spec — {result.spec.length} events</h2>
+            <div className="results-actions">
+              <button className="btn btn-ghost" onClick={() => download("json")}>
+                Download JSON
+              </button>
+              <button className="btn btn-ghost" onClick={() => download("csv")}>
+                Download CSV
+              </button>
+            </div>
           </div>
-          <table border={1} cellPadding={4}>
-            <thead>
-              <tr>
-                {columns.map((c) => (
-                  <th key={c}>{c}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {result.spec.map((row, i) => (
-                <tr key={i}>
+
+          <div className="spec-table-wrap">
+            <table>
+              <thead>
+                <tr>
                   {columns.map((c) => (
-                    <td key={c}>{String(row[c] ?? "")}</td>
+                    <th key={c}>{c}</th>
                   ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {result.spec.map((row, i) => (
+                  <tr key={i}>
+                    {columns.map((c) => (
+                      <td key={c}>
+                        {c === nameCol ? (
+                          <span className={`badge ${badgeClass(row[c])}`}>
+                            <span className="dot" />
+                            {badgeLabel(row[c])} {String(row[c] ?? "")}
+                          </span>
+                        ) : (
+                          String(row[c] ?? "")
+                        )}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </>
       )}
     </main>
