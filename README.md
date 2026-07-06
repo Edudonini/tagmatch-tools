@@ -6,7 +6,7 @@ https://tagmatch-tools.vercel.app
 
 ## Tools
 
-- `/extract-map` — extract a TagMatch spec from a Whimsical SVG export.
+- `/extract-map` — extract a TagMatch spec from a Whimsical SVG export, with an optional event-by-event review mode (visual crop preview, edit/delete/add).
 - `/extract-logs` — parse and merge Logcat/NDJSON/Dev JSON/Firebase log files into one deduplicated events table.
 
 ## Getting Started
