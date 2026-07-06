@@ -1,0 +1,5 @@
+[
+  {"ts": 1.0, "origin": "tracker", "ga_name": "screen_view", "name_norm": "screen_view", "eventCategory": "b2c_ecare_napp", "eventAction": "", "eventLabel": "", "screenName": "/napp/home", "raw_line": "a"},
+  {"ts": 2.0, "origin": "tracker", "ga_name": "interaction", "name_norm": "interaction", "eventCategory": "b2c_ecare_napp", "eventAction": "screen_click_button", "eventLabel": "actual_label", "screenName": "/napp/home", "raw_line": "b"},
+  {"ts": 3.0, "origin": "tracker", "ga_name": "interaction", "name_norm": "interaction", "eventCategory": "b2c_ecare_napp", "eventAction": "screen_click_extra", "eventLabel": "x", "screenName": "/napp/elsewhere", "raw_line": "c"}
+]

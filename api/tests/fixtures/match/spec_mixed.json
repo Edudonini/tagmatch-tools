@@ -1,0 +1,5 @@
+[
+  {"spec_id": "s1", "name": "screen_view", "event_order": 1, "sn": "/napp/home", "ct": "b2c_ecare_napp", "ac": "", "lb": "", "sn_regex": "^/napp/home$", "ct_regex": "^b2c_ecare_napp$"},
+  {"spec_id": "s2", "name": "interaction", "event_order": 2, "sn": "/napp/home", "ct": "b2c_ecare_napp", "ac": "screen_click_button", "lb": "expected_label", "sn_regex": "^/napp/home$", "ac_regex": "^screen_click_button$", "lb_regex": "^expected_label$", "ct_regex": "^b2c_ecare_napp$"},
+  {"spec_id": "s3", "name": "interaction", "event_order": 3, "sn": "/napp/missing", "ct": "b2c_ecare_napp", "ac": "never_fires", "lb": "nope", "sn_regex": "^/napp/missing$", "ac_regex": "^never_fires$", "lb_regex": "^nope$", "ct_regex": "^b2c_ecare_napp$"}
+]
