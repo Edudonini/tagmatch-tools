@@ -73,6 +73,8 @@ def run_matching(spec_file: tuple, logs_file: tuple) -> dict:
 
     if len(spec_records) == 0:
         return {"ok": False, "error": "The spec file contains no events."}
+    if not isinstance(spec_records[0], dict):
+        return {"ok": False, "error": "The spec file must be an array of event objects."}
     if "name" not in spec_records[0]:
         return {"ok": False, "error": "The spec file has no 'name' field - is this a Map Extraction output?"}
 

@@ -123,3 +123,11 @@ def test_match_spec_missing_name_rejected():
 def test_match_invalid_spec_file_rejected():
     result = run_matching(("spec.json", b"{not json"), _logs("logs_clean.json"))
     assert result["ok"] is False
+
+
+def test_match_non_dict_spec_array_rejected():
+    # A JSON array of non-objects must not raise - the contract is "never
+    # raises for user input" (regression guard for the isinstance check).
+    result = run_matching(("spec.json", b"[1, 2, 3]"), _logs("logs_clean.json"))
+    assert result["ok"] is False
+    assert "error" in result
