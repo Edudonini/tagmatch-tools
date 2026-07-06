@@ -16,11 +16,11 @@ const TOOLS = [
     available: false,
   },
   {
-    href: "#",
+    href: "/extract-logs",
     glyph: "LX",
     name: "Log Extraction",
-    desc: "Pull raw analytics logs for a run — coming soon.",
-    available: false,
+    desc: "Parse and merge Logcat/NDJSON/Dev JSON/Firebase logs into one events table.",
+    available: true,
   },
 ];
 
