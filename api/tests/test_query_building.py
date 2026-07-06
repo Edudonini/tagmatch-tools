@@ -154,6 +154,31 @@ def test_invalid_table_name_rejected():
     assert "table" in result["error"].lower()
 
 
+def test_custom_rejects_injected_output_column():
+    result = build_query(
+        _events(),
+        "custom",
+        {**BASE_OPTIONS, "selected_event_orders": [1], "output_columns": ["event_name, (SELECT 1) --"]},
+    )
+    assert result["ok"] is False
+    assert "output column" in result["error"].lower()
+
+
+def test_custom_rejects_injected_filter_field():
+    result = build_query(
+        _events(),
+        "custom",
+        {
+            **BASE_OPTIONS,
+            "selected_event_orders": [1],
+            "filter_fields_per_event": {"1": ["sn); DROP TABLE x; --"]},
+            "output_columns": ["event_name"],
+        },
+    )
+    assert result["ok"] is False
+    assert "filter field" in result["error"].lower()
+
+
 # --- error paths ---
 
 def test_invalid_query_type():

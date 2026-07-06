@@ -3,8 +3,9 @@
 Wraps the current-generation builders in tagmatch.query_builders (NOT the
 legacy tagmatch.query_builder.QueryBuilder). All builders are pure:
 df_spec + options -> {"query": SQL, "event_mapping", "metadata", ...}.
-The only user-controlled strings that reach SQL outside escape_sql_string
-are the table name and the dates, so both are validated here first.
+User-controlled strings that reach SQL as raw text - the table name, the
+dates, and the custom type's output columns and filter field names - are
+all validated here before any builder is called.
 """
 import io
 import json
@@ -20,6 +21,33 @@ from tagmatch.query_builders.volumetry_builder import VolumetryQueryBuilder
 VALID_QUERY_TYPES = ("validation", "volumetry", "funnel", "custom")
 
 _DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+_IDENTIFIER_RE = re.compile(r"^[A-Za-z0-9_]+$")
+
+# Spec fields the custom builder maps to Silver columns - mirrors the
+# platform frontend's FILTER_FIELDS (CustomQueryPanel.tsx:49). Anything
+# else would fall through the builder's mapping .get(field, field)
+# fallbacks and land in SQL as a raw identifier.
+VALID_FILTER_FIELDS = (
+    "sn", "ct", "ac", "lb",
+    "component_copy", "component_type", "module_name", "item_name", "item_id",
+)
+
+
+def _validated_custom_inputs(options: dict):
+    output_columns = [str(c) for c in options.get("output_columns", [])]
+    for col in output_columns:
+        if not _IDENTIFIER_RE.match(col):
+            raise ValueError(f"Invalid output column: '{col}'.")
+    filter_fields = options.get("filter_fields_per_event", {})
+    validated_filters = {}
+    for order, fields in dict(filter_fields).items():
+        clean = [str(f) for f in fields]
+        for f in clean:
+            if f not in VALID_FILTER_FIELDS:
+                raise ValueError(f"Invalid filter field: '{f}'. Must be one of {VALID_FILTER_FIELDS}.")
+        validated_filters[str(order)] = clean
+    return output_columns, validated_filters
 
 
 def _sanitize(obj):
@@ -129,14 +157,15 @@ def build_query(events: list, query_type: str, options: dict) -> dict:
                 count_mode=count_mode,
             )
         else:  # custom
+            output_columns, filter_fields = _validated_custom_inputs(options)
             builder = CustomQueryBuilder(schema_config=schema_config)
             result = builder.build_custom_query(
                 df,
                 start_date,
                 end_date=end_date,
                 selected_event_orders=[int(o) for o in options.get("selected_event_orders", [])],
-                filter_fields_per_event=options.get("filter_fields_per_event", {}),
-                output_columns=options.get("output_columns", []),
+                filter_fields_per_event=filter_fields,
+                output_columns=output_columns,
                 count_mode=count_mode,
             )
     except ValueError as e:
