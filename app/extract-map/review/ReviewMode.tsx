@@ -95,7 +95,7 @@ export function ReviewMode({ rows, svgContent, onChange, onExit }: ReviewModePro
       </div>
 
       <EventReviewCard
-        key={clampedIndex}
+        key={`${clampedIndex}:${rows.length}`}
         event={current}
         svgContent={svgContent}
         parsedRoot={parsedRoot}
