@@ -8,6 +8,12 @@ type ExtractLogsResult =
   | { ok: true; logs: Record<string, unknown>[]; report: Record<string, unknown> }
   | { ok: false; error: string };
 
+type FileReportEntry = { filename: string; detected_format: string | null; row_count: number; error: string | null };
+
+function getFiles(report: Record<string, unknown>): FileReportEntry[] {
+  return Array.isArray(report.files) ? (report.files as FileReportEntry[]) : [];
+}
+
 export default function ExtractLogsPage() {
   const [files, setFiles] = useState<File[]>([]);
   const [format, setFormat] = useState("auto");
@@ -37,6 +43,9 @@ export default function ExtractLogsPage() {
       setLoading(false);
     }
   }
+
+  const reportFiles = result && result.ok ? getFiles(result.report) : [];
+  const reportFailedFiles = reportFiles.filter((f) => f.error);
 
   return (
     <main className="shell">
@@ -91,13 +100,22 @@ export default function ExtractLogsPage() {
       )}
 
       {result && result.ok && (
-        <ResultsPanel
-          rows={result.logs}
-          report={result.report}
-          entityLabel="Logs"
-          badgeColumn="name_norm"
-          downloadBaseName="logs"
-        />
+        <>
+          {reportFailedFiles.length > 0 && (
+            <p className="alert-warning">
+              {reportFailedFiles.length} of {reportFiles.length}{" "}
+              file(s) couldn&apos;t be parsed — see Full report below for
+              details.
+            </p>
+          )}
+          <ResultsPanel
+            rows={result.logs}
+            report={result.report}
+            entityLabel="Logs"
+            badgeColumn="name_norm"
+            downloadBaseName="logs"
+          />
+        </>
       )}
     </main>
   );

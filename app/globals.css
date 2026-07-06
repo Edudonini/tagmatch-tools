@@ -16,6 +16,8 @@
   --nonint-soft: rgba(74, 222, 128, 0.14);
   --error: #f87171;
   --error-soft: rgba(248, 113, 113, 0.12);
+  --warning: #eab308;
+  --warning-soft: rgba(234, 179, 8, 0.14);
 }
 
 @media (prefers-color-scheme: light) {
@@ -32,6 +34,7 @@
     --int-soft: rgba(224, 68, 68, 0.1);
     --nonint-soft: rgba(34, 168, 96, 0.1);
     --error-soft: rgba(224, 68, 68, 0.08);
+    --warning-soft: rgba(202, 138, 4, 0.1);
   }
 }
 
@@ -321,6 +324,17 @@ select {
   background: var(--error-soft);
   border: 1px solid var(--error);
   color: var(--error);
+  font-size: 13.5px;
+  font-family: var(--font-mono), ui-monospace, monospace;
+}
+
+.alert-warning {
+  margin-top: 20px;
+  padding: 13px 16px;
+  border-radius: 8px;
+  background: var(--warning-soft);
+  border: 1px solid var(--warning);
+  color: var(--warning);
   font-size: 13.5px;
   font-family: var(--font-mono), ui-monospace, monospace;
 }
