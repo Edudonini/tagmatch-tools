@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useState } from "react";
 import { ResultsPanel } from "../_lib/ResultsPanel";
+import { ReviewMode } from "./review/ReviewMode";
+import { clearSvgCropCache } from "./review/useSvgCropUrl";
 
 type ExtractResult =
   | { ok: true; spec: Record<string, unknown>[]; report: Record<string, unknown> }
@@ -13,12 +15,18 @@ export default function ExtractMapPage() {
   const [mode, setMode] = useState("card");
   const [result, setResult] = useState<ExtractResult | null>(null);
   const [loading, setLoading] = useState(false);
+  const [svgContent, setSvgContent] = useState<string | null>(null);
+  const [reviewing, setReviewing] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!file) return;
     setLoading(true);
     setResult(null);
+    setReviewing(false);
+    clearSvgCropCache();
+    const text = await file.text();
+    setSvgContent(text);
     const formData = new FormData();
     formData.append("file", file);
     formData.append("mode", mode);
@@ -72,13 +80,29 @@ export default function ExtractMapPage() {
         <p className="alert-error">Couldn&apos;t extract a spec: {result.error}</p>
       )}
 
-      {result && result.ok && (
-        <ResultsPanel
+      {result && result.ok && !reviewing && (
+        <>
+          <div className="review-entry-bar">
+            <button className="btn btn-ghost" onClick={() => setReviewing(true)}>
+              Review events →
+            </button>
+          </div>
+          <ResultsPanel
+            rows={result.spec}
+            report={result.report}
+            entityLabel="Spec"
+            badgeColumn="name"
+            downloadBaseName="spec"
+          />
+        </>
+      )}
+
+      {result && result.ok && reviewing && (
+        <ReviewMode
           rows={result.spec}
-          report={result.report}
-          entityLabel="Spec"
-          badgeColumn="name"
-          downloadBaseName="spec"
+          svgContent={svgContent}
+          onChange={(newRows) => setResult({ ...result, spec: newRows })}
+          onExit={() => setReviewing(false)}
         />
       )}
     </main>

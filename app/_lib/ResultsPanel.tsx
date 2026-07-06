@@ -61,7 +61,12 @@ function triggerDownload(rows: ResultRow[], columns: string[], format: "json" | 
 export function ResultsPanel({ rows, report, entityLabel, badgeColumn, downloadBaseName }: ResultsPanelProps) {
   const [showAllColumns, setShowAllColumns] = useState(false);
 
-  const allColumns = rows.length > 0 ? Object.keys(rows[0]) : [];
+  const allColumns = Array.from(
+    rows.reduce((set, row) => {
+      Object.keys(row).forEach((k) => set.add(k));
+      return set;
+    }, new Set<string>())
+  );
   const populatedColumns = allColumns.filter((c) =>
     rows.some((r) => {
       const v = r[c];
