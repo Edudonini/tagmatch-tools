@@ -4,11 +4,14 @@ import Link from "next/link";
 import { useState } from "react";
 import { ResultsPanel } from "../_lib/ResultsPanel";
 import { ReviewMode } from "./review/ReviewMode";
+import { MapView } from "./mapview/MapView";
 import { clearSvgCropCache } from "./review/useSvgCropUrl";
 
 type ExtractResult =
   | { ok: true; spec: Record<string, unknown>[]; report: Record<string, unknown> }
   | { ok: false; error: string };
+
+type View = "table" | "review" | "map";
 
 export default function ExtractMapPage() {
   const [file, setFile] = useState<File | null>(null);
@@ -16,14 +19,14 @@ export default function ExtractMapPage() {
   const [result, setResult] = useState<ExtractResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [svgContent, setSvgContent] = useState<string | null>(null);
-  const [reviewing, setReviewing] = useState(false);
+  const [view, setView] = useState<View>("table");
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!file) return;
     setLoading(true);
     setResult(null);
-    setReviewing(false);
+    setView("table");
     clearSvgCropCache();
     const text = await file.text();
     setSvgContent(text);
@@ -80,10 +83,13 @@ export default function ExtractMapPage() {
         <p className="alert-error">Couldn&apos;t extract a spec: {result.error}</p>
       )}
 
-      {result && result.ok && !reviewing && (
+      {result && result.ok && view === "table" && (
         <>
           <div className="review-entry-bar">
-            <button className="btn btn-ghost" onClick={() => setReviewing(true)}>
+            <button className="btn btn-ghost" onClick={() => setView("map")}>
+              Map view →
+            </button>
+            <button className="btn btn-ghost" onClick={() => setView("review")}>
               Review events →
             </button>
           </div>
@@ -97,12 +103,16 @@ export default function ExtractMapPage() {
         </>
       )}
 
-      {result && result.ok && reviewing && (
+      {result && result.ok && view === "map" && (
+        <MapView rows={result.spec} onExit={() => setView("table")} />
+      )}
+
+      {result && result.ok && view === "review" && (
         <ReviewMode
           rows={result.spec}
           svgContent={svgContent}
           onChange={(newRows) => setResult({ ...result, spec: newRows })}
-          onExit={() => setReviewing(false)}
+          onExit={() => setView("table")}
         />
       )}
     </main>
