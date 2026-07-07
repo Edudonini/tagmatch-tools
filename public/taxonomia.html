@@ -1,0 +1,824 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nova Taxonomia — App 5.0 Vivo</title>
+<meta name="description" content="Guia de consulta do de-para da nova taxonomia de tagueamento do App 5.0 da Vivo: parâmetros obrigatórios por evento e exemplos por jornada.">
+<style>
+  :root {
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --mono: ui-monospace, "SF Mono", "Cascadia Code", "JetBrains Mono", Menlo, Consolas, monospace;
+
+    --bg: #faf7fd;
+    --panel: #ffffff;
+    --panel-2: #f4eff9;
+    --border: #e7ddf1;
+    --border-strong: #d7c8e8;
+    --ink: #241a31;
+    --ink-muted: #6a607b;
+    --ink-faint: #9a90ac;
+    --accent: #7b2cbf;
+    --accent-2: #9a4de0;
+    --accent-ink: #ffffff;
+    --accent-soft: rgba(123, 44, 191, 0.09);
+
+    --renamed: #7b2cbf;
+    --renamed-soft: rgba(123, 44, 191, 0.10);
+    --adjusted: #b26a00;
+    --adjusted-soft: rgba(178, 106, 0, 0.12);
+    --removed: #c02b4e;
+    --removed-soft: rgba(192, 43, 78, 0.10);
+    --dest: #0f8a72;
+    --dest-soft: rgba(15, 138, 114, 0.11);
+
+    --sv: #2f66d8;
+    --sv-soft: rgba(47, 102, 216, 0.12);
+    --int: #c43d8a;
+    --int-soft: rgba(196, 61, 138, 0.12);
+    --nonint: #1e9268;
+    --nonint-soft: rgba(30, 146, 104, 0.12);
+    --err: #c02b4e;
+    --err-soft: rgba(192, 43, 78, 0.12);
+    --prod: #b26a00;
+    --prod-soft: rgba(178, 106, 0, 0.12);
+
+    --radius: 14px;
+    --radius-sm: 9px;
+    --shadow: 0 1px 2px rgba(36, 26, 49, 0.04), 0 8px 24px -12px rgba(36, 26, 49, 0.12);
+    --maxw: 1080px;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #120d1a;
+      --panel: #1a1324;
+      --panel-2: #221930;
+      --border: #322542;
+      --border-strong: #43324f;
+      --ink: #ece6f4;
+      --ink-muted: #a99fbb;
+      --ink-faint: #6f6480;
+      --accent: #b98bea;
+      --accent-2: #cba5f2;
+      --accent-ink: #1a1324;
+      --accent-soft: rgba(185, 139, 234, 0.13);
+
+      --renamed: #c49bf0;
+      --renamed-soft: rgba(185, 139, 234, 0.14);
+      --adjusted: #e0a94a;
+      --adjusted-soft: rgba(224, 169, 74, 0.15);
+      --removed: #ef7a94;
+      --removed-soft: rgba(239, 122, 148, 0.14);
+      --dest: #4fc9ac;
+      --dest-soft: rgba(79, 201, 172, 0.14);
+
+      --sv: #77a3f2;
+      --sv-soft: rgba(119, 163, 242, 0.15);
+      --int: #ec87bd;
+      --int-soft: rgba(236, 135, 189, 0.15);
+      --nonint: #5cc79c;
+      --nonint-soft: rgba(92, 199, 156, 0.15);
+      --err: #ef7a94;
+      --err-soft: rgba(239, 122, 148, 0.15);
+      --prod: #e0a94a;
+      --prod-soft: rgba(224, 169, 74, 0.15);
+
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 10px 30px -14px rgba(0, 0, 0, 0.6);
+    }
+  }
+
+  :root[data-theme="light"] {
+    --bg: #faf7fd; --panel: #ffffff; --panel-2: #f4eff9; --border: #e7ddf1; --border-strong: #d7c8e8;
+    --ink: #241a31; --ink-muted: #6a607b; --ink-faint: #9a90ac;
+    --accent: #7b2cbf; --accent-2: #9a4de0; --accent-ink: #ffffff; --accent-soft: rgba(123, 44, 191, 0.09);
+    --renamed: #7b2cbf; --renamed-soft: rgba(123, 44, 191, 0.10);
+    --adjusted: #b26a00; --adjusted-soft: rgba(178, 106, 0, 0.12);
+    --removed: #c02b4e; --removed-soft: rgba(192, 43, 78, 0.10);
+    --dest: #0f8a72; --dest-soft: rgba(15, 138, 114, 0.11);
+    --sv: #2f66d8; --sv-soft: rgba(47, 102, 216, 0.12);
+    --int: #c43d8a; --int-soft: rgba(196, 61, 138, 0.12);
+    --nonint: #1e9268; --nonint-soft: rgba(30, 146, 104, 0.12);
+    --err: #c02b4e; --err-soft: rgba(192, 43, 78, 0.12);
+    --prod: #b26a00; --prod-soft: rgba(178, 106, 0, 0.12);
+    --shadow: 0 1px 2px rgba(36, 26, 49, 0.04), 0 8px 24px -12px rgba(36, 26, 49, 0.12);
+  }
+  :root[data-theme="dark"] {
+    --bg: #120d1a; --panel: #1a1324; --panel-2: #221930; --border: #322542; --border-strong: #43324f;
+    --ink: #ece6f4; --ink-muted: #a99fbb; --ink-faint: #6f6480;
+    --accent: #b98bea; --accent-2: #cba5f2; --accent-ink: #1a1324; --accent-soft: rgba(185, 139, 234, 0.13);
+    --renamed: #c49bf0; --renamed-soft: rgba(185, 139, 234, 0.14);
+    --adjusted: #e0a94a; --adjusted-soft: rgba(224, 169, 74, 0.15);
+    --removed: #ef7a94; --removed-soft: rgba(239, 122, 148, 0.14);
+    --dest: #4fc9ac; --dest-soft: rgba(79, 201, 172, 0.14);
+    --sv: #77a3f2; --sv-soft: rgba(119, 163, 242, 0.15);
+    --int: #ec87bd; --int-soft: rgba(236, 135, 189, 0.15);
+    --nonint: #5cc79c; --nonint-soft: rgba(92, 199, 156, 0.15);
+    --err: #ef7a94; --err-soft: rgba(239, 122, 148, 0.15);
+    --prod: #e0a94a; --prod-soft: rgba(224, 169, 74, 0.15);
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 10px 30px -14px rgba(0, 0, 0, 0.6);
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--sans);
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    padding-bottom: 80px;
+  }
+
+  .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 24px; }
+  a { color: inherit; }
+
+  .theme-toggle {
+    position: fixed; top: 16px; right: 16px; z-index: 50;
+    display: inline-flex; align-items: center; gap: 7px;
+    background: var(--panel); color: var(--ink-muted);
+    border: 1px solid var(--border); border-radius: 999px;
+    padding: 7px 13px; font-size: 12.5px; font-family: var(--sans);
+    cursor: pointer; box-shadow: var(--shadow);
+  }
+  .theme-toggle:hover { color: var(--ink); border-color: var(--border-strong); }
+  .theme-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  header.masthead {
+    padding: 68px 0 30px;
+    background: radial-gradient(1200px 340px at 12% -8%, var(--accent-soft), transparent 60%);
+  }
+  .eyebrow {
+    font-family: var(--mono); font-size: 12px; letter-spacing: 0.14em;
+    text-transform: uppercase; color: var(--accent); font-weight: 600;
+  }
+  h1 {
+    font-size: clamp(30px, 5vw, 46px); line-height: 1.06; letter-spacing: -0.02em;
+    font-weight: 800; margin: 14px 0 0; text-wrap: balance; max-width: 20ch;
+  }
+  .lede {
+    margin: 16px 0 0; font-size: clamp(15px, 2vw, 17.5px); color: var(--ink-muted);
+    max-width: 62ch; line-height: 1.55;
+  }
+  .meta-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 24px; }
+  .meta {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 999px; padding: 7px 14px; font-size: 13px; color: var(--ink-muted);
+  }
+  .meta strong { color: var(--ink); font-weight: 600; }
+  .meta .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); flex: none; }
+
+  nav.jump {
+    position: sticky; top: 0; z-index: 40;
+    background: color-mix(in srgb, var(--bg) 86%, transparent);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--border);
+    margin-top: 30px;
+  }
+  nav.jump .wrap { display: flex; gap: 4px; overflow-x: auto; padding-top: 8px; padding-bottom: 8px; }
+  nav.jump a {
+    white-space: nowrap; text-decoration: none; font-size: 13.5px; color: var(--ink-muted);
+    padding: 8px 14px; border-radius: 999px; font-weight: 500;
+  }
+  nav.jump a:hover { color: var(--ink); background: var(--panel-2); }
+  nav.jump a.active { color: var(--accent); background: var(--accent-soft); }
+  nav.jump a:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+  section { padding: 52px 0 8px; scroll-margin-top: 64px; }
+  .sec-head { margin-bottom: 26px; }
+  .sec-kicker {
+    font-family: var(--mono); font-size: 11.5px; letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--ink-faint); font-weight: 600;
+  }
+  h2 { font-size: clamp(22px, 3.4vw, 30px); letter-spacing: -0.02em; font-weight: 750; margin: 8px 0 0; text-wrap: balance; }
+  .sec-sub { color: var(--ink-muted); font-size: 15px; margin: 10px 0 0; max-width: 64ch; }
+
+  .grid4 { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+  .change {
+    background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 20px; box-shadow: var(--shadow); position: relative; overflow: hidden;
+  }
+  .change::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 3px; background: var(--tone, var(--accent)); }
+  .change .tag {
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase;
+    font-weight: 600; color: var(--tone, var(--accent));
+  }
+  .change h3 { font-size: 15.5px; margin: 10px 0 6px; font-weight: 650; letter-spacing: -0.01em; }
+  .change p { margin: 0; font-size: 13.5px; color: var(--ink-muted); line-height: 1.5; }
+  .change code { font-family: var(--mono); font-size: 0.92em; background: var(--panel-2); padding: 1px 5px; border-radius: 5px; }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 8px 16px; margin: 0 0 22px; }
+  .legend .li { display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--ink-muted); }
+  .legend .sw { width: 12px; height: 12px; border-radius: 4px; flex: none; }
+
+  .depara { display: flex; flex-direction: column; gap: 12px; }
+  .dp {
+    background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
+    box-shadow: var(--shadow); overflow: hidden;
+  }
+  .dp-top { display: grid; grid-template-columns: 1fr auto 1.35fr; align-items: center; gap: 12px; padding: 16px 18px; }
+  .dp-side { min-width: 0; }
+  .dp-label {
+    font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--ink-faint); font-weight: 600; margin-bottom: 8px;
+  }
+  .field {
+    display: inline-flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 14.5px;
+    font-weight: 600; padding: 6px 11px; border-radius: 8px; background: var(--panel-2); color: var(--ink);
+    max-width: 100%;
+  }
+  .field.old-removed { text-decoration: line-through; text-decoration-color: var(--removed); text-decoration-thickness: 2px; color: var(--ink-muted); }
+  .field.tone-new { background: var(--accent-soft); color: var(--accent); }
+  .arrow {
+    display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 28px;
+    color: var(--tone, var(--accent)); font-size: 19px; flex: none;
+  }
+  .badge {
+    display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 650;
+    padding: 4px 9px; border-radius: 999px; letter-spacing: 0.02em;
+    background: var(--tone-soft); color: var(--tone);
+  }
+  .dp-note {
+    border-top: 1px dashed var(--border-strong); padding: 12px 18px;
+    font-size: 13px; color: var(--ink-muted); background: var(--panel-2);
+  }
+  .destchips { display: inline-flex; flex-wrap: wrap; gap: 6px; vertical-align: middle; }
+  .destchip {
+    font-family: var(--mono); font-size: 12px; font-weight: 600; padding: 3px 8px; border-radius: 6px;
+    background: var(--dest-soft); color: var(--dest);
+  }
+  .valuemap { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .valuemap code { font-family: var(--mono); font-size: 13px; padding: 3px 8px; border-radius: 6px; background: var(--panel); border: 1px solid var(--border); }
+  .valuemap code.was { text-decoration: line-through; text-decoration-color: var(--adjusted); color: var(--ink-muted); }
+  .valuemap code.now { background: var(--adjusted-soft); color: var(--adjusted); border-color: transparent; font-weight: 650; }
+
+  .taxo { display: grid; grid-template-columns: 1fr; gap: 16px; }
+  .tcard {
+    background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
+    box-shadow: var(--shadow); overflow: hidden;
+  }
+  .tcard-head {
+    display: flex; align-items: center; gap: 12px; padding: 16px 20px;
+    border-bottom: 1px solid var(--border); background: var(--tone-soft, var(--panel-2));
+    flex-wrap: wrap;
+  }
+  .tchip {
+    display: inline-flex; align-items: center; gap: 7px; font-family: var(--mono); font-size: 12.5px;
+    font-weight: 700; padding: 5px 11px; border-radius: 999px; background: var(--tone-soft); color: var(--tone);
+    border: 1px solid color-mix(in srgb, var(--tone) 28%, transparent);
+  }
+  .tchip .d { width: 8px; height: 8px; border-radius: 50%; background: var(--tone); }
+  .tcard-head .ht { font-size: 15px; font-weight: 650; }
+  .tcard-head .plus {
+    margin-left: auto; font-family: var(--mono); font-size: 11.5px; color: var(--ink-faint);
+    text-transform: uppercase; letter-spacing: 0.08em;
+  }
+  .params { padding: 6px 0; }
+  .prow {
+    display: grid; grid-template-columns: minmax(150px, 210px) 1fr; gap: 14px; align-items: baseline;
+    padding: 12px 20px; border-bottom: 1px solid var(--border);
+  }
+  .prow:last-child { border-bottom: none; }
+  .pk { font-family: var(--mono); font-size: 13.5px; font-weight: 650; color: var(--ink); word-break: break-word; }
+  .pd { font-size: 13px; color: var(--ink-muted); }
+  .pd .enums { display: inline-flex; flex-wrap: wrap; gap: 6px; margin-top: 7px; }
+  .en {
+    font-family: var(--mono); font-size: 12px; font-weight: 600; padding: 3px 8px; border-radius: 6px;
+    background: var(--panel-2); color: var(--ink); border: 1px solid var(--border);
+  }
+  .en.hl { background: var(--tone-soft); color: var(--tone); border-color: transparent; }
+  .pattern { font-family: var(--mono); font-size: 12.5px; color: var(--accent); background: var(--accent-soft); padding: 2px 7px; border-radius: 6px; }
+
+  .ex { display: flex; flex-direction: column; gap: 20px; }
+  .excard {
+    background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
+    box-shadow: var(--shadow); overflow: hidden;
+  }
+  .excard-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 16px 20px; border-bottom: 1px solid var(--border); }
+  .excard-head .jn { font-size: 16px; font-weight: 700; letter-spacing: -0.01em; }
+  .excard-head .ctx { font-size: 13px; color: var(--ink-muted); }
+  .evt-badge {
+    display: inline-flex; align-items: center; gap: 6px; font-family: var(--mono); font-size: 11.5px; font-weight: 700;
+    padding: 4px 10px; border-radius: 999px; background: var(--tone-soft); color: var(--tone);
+  }
+  .evt-badge .d { width: 7px; height: 7px; border-radius: 50%; background: var(--tone); }
+  .dept-pill {
+    margin-left: auto; font-size: 11.5px; color: var(--ink-muted); font-family: var(--mono);
+    background: var(--panel-2); border: 1px solid var(--border); padding: 4px 10px; border-radius: 999px;
+  }
+  .cols { display: grid; grid-template-columns: 1fr 1fr; }
+  .col { padding: 16px 20px; min-width: 0; }
+  .col.before { border-right: 1px solid var(--border); background: var(--panel-2); }
+  .col-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+  .col-head .ttl { font-family: var(--mono); font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; font-weight: 700; }
+  .col.before .ttl { color: var(--ink-faint); }
+  .col.after .ttl { color: var(--dest); }
+  .copy {
+    display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-family: var(--sans);
+    color: var(--ink-muted); background: var(--panel); border: 1px solid var(--border);
+    border-radius: 7px; padding: 5px 10px; cursor: pointer;
+  }
+  .copy:hover { color: var(--ink); border-color: var(--border-strong); }
+  .copy:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .copy.done { color: var(--dest); border-color: var(--dest); }
+  .kv { display: flex; flex-direction: column; gap: 3px; font-family: var(--mono); font-size: 12.8px; }
+  .kv .p { display: grid; grid-template-columns: minmax(120px, 42%) 1fr; gap: 10px; padding: 3px 0; align-items: baseline; }
+  .kv .k { color: var(--ink-muted); }
+  .kv .v { color: var(--ink); font-weight: 600; word-break: break-word; }
+  .kv .p.gone .k, .kv .p.gone .v { text-decoration: line-through; color: var(--ink-faint); text-decoration-color: var(--removed); }
+  .kv .p.add .v { color: var(--dest); }
+  .kv .p.chg .v { color: var(--adjusted); }
+
+  .footnote {
+    margin-top: 44px; background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 22px 24px; box-shadow: var(--shadow);
+  }
+  .footnote h3 { margin: 0 0 12px; font-size: 14px; letter-spacing: 0.02em; }
+  .footnote ul { margin: 0; padding-left: 18px; color: var(--ink-muted); font-size: 13.5px; display: flex; flex-direction: column; gap: 8px; }
+  .footnote li strong { color: var(--ink); font-weight: 600; }
+  .credit { margin-top: 26px; text-align: center; font-size: 12px; color: var(--ink-faint); }
+
+  @media (max-width: 720px) {
+    .dp-top { grid-template-columns: 1fr; }
+    .dp-top .arrow { transform: rotate(90deg); }
+    .cols { grid-template-columns: 1fr; }
+    .col.before { border-right: none; border-bottom: 1px solid var(--border); }
+    .prow { grid-template-columns: 1fr; gap: 6px; }
+    .kv .p { grid-template-columns: 1fr; gap: 0; }
+    .kv .k { font-size: 11.5px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } * { transition: none !important; } }
+</style>
+</head>
+<body>
+  <button class="theme-toggle" id="themeBtn" aria-label="Alternar tema">
+    <span id="themeIcon">◑</span><span id="themeLabel">Tema</span>
+  </button>
+
+  <header class="masthead">
+    <div class="wrap">
+      <div class="eyebrow">Vivo · App 5.0 · Guia de Taxonomia</div>
+      <h1>De-Para da nova taxonomia de tagueamento</h1>
+      <p class="lede">
+        Referência de consulta para os analistas: o que mudou na estrutura de tagueamento do App 5.0,
+        os novos parâmetros obrigatórios por tipo de evento e exemplos reais, antes e depois, por jornada.
+      </p>
+      <div class="meta-row">
+        <span class="meta"><span class="dot"></span><strong>Escopo:</strong>&nbsp;todos os mapas do App 5.0 e novos mapeamentos</span>
+        <span class="meta"><strong>Vigência:</strong>&nbsp;imediata</span>
+        <span class="meta"><strong>E-commerce:</strong>&nbsp;definições nos próximos comunicados</span>
+      </div>
+    </div>
+  </header>
+
+  <nav class="jump" aria-label="Navegação da página">
+    <div class="wrap">
+      <a href="#mudancas" class="active">Principais mudanças</a>
+      <a href="#depara">De-Para dos campos</a>
+      <a href="#taxonomia">Nova taxonomia</a>
+      <a href="#exemplos">Exemplos por jornada</a>
+    </div>
+  </nav>
+
+  <main class="wrap">
+
+    <section id="mudancas">
+      <div class="sec-head">
+        <div class="sec-kicker">O que muda</div>
+        <h2>As quatro mudanças principais</h2>
+        <p class="sec-sub">Padronização da contextualização dos parâmetros e ajuste das regras de disparo. Aplicam-se a partir de agora.</p>
+      </div>
+      <div class="grid4">
+        <div class="change" style="--tone: var(--renamed)">
+          <div class="tag">Renomeação</div>
+          <h3>Textos do score-card</h3>
+          <p><code>name</code> passa a ser <code>event</code> e <code>sn</code> passa a ser <code>screenName</code>.</p>
+        </div>
+        <div class="change" style="--tone: var(--adjusted)">
+          <div class="tag">Ajuste de valor</div>
+          <h3>screenName sem “napp”</h3>
+          <p>O prefixo <code>napp</code> deixa de aparecer no valor do <code>screenName</code>.</p>
+        </div>
+        <div class="change" style="--tone: var(--removed)">
+          <div class="tag">Remoção</div>
+          <h3>Fim do trio ct / ac / lb</h3>
+          <p><code>eventCategory</code>, <code>eventAction</code> e <code>eventLabel</code> saem — a informação migra para campos da nova estrutura.</p>
+        </div>
+        <div class="change" style="--tone: var(--dest)">
+          <div class="tag">Novos obrigatórios</div>
+          <h3>Conjuntos por evento</h3>
+          <p>Parâmetros específicos para tela, interação, erro e jornadas com desambiguação de produto.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="depara">
+      <div class="sec-head">
+        <div class="sec-kicker">Campo a campo</div>
+        <h2>De-Para dos parâmetros</h2>
+        <p class="sec-sub">Cada campo antigo e para onde a informação vai na nova estrutura.</p>
+      </div>
+
+      <div class="legend">
+        <span class="li"><span class="sw" style="background: var(--renamed)"></span> Renomeado — muda só o nome do campo</span>
+        <span class="li"><span class="sw" style="background: var(--adjusted)"></span> Ajustado — muda o formato do valor</span>
+        <span class="li"><span class="sw" style="background: var(--removed)"></span> Removido — o campo deixa de existir</span>
+        <span class="li"><span class="sw" style="background: var(--dest)"></span> Novo destino — para onde a informação foi</span>
+      </div>
+
+      <div class="depara">
+
+        <div class="dp">
+          <div class="dp-top" style="--tone: var(--renamed)">
+            <div class="dp-side"><div class="dp-label">Antes</div><span class="field">name</span></div>
+            <div class="arrow">→</div>
+            <div class="dp-side"><div class="dp-label">Depois</div><span class="field tone-new">event</span>
+              <span class="badge" style="--tone: var(--renamed); --tone-soft: var(--renamed-soft); margin-left: 8px">Renomeado</span></div>
+          </div>
+          <div class="dp-note">Mesma função — identifica o nome do evento a ser disparado. Muda apenas o texto do score-card.</div>
+        </div>
+
+        <div class="dp">
+          <div class="dp-top" style="--tone: var(--renamed)">
+            <div class="dp-side"><div class="dp-label">Antes</div><span class="field">sn</span></div>
+            <div class="arrow">→</div>
+            <div class="dp-side"><div class="dp-label">Depois</div><span class="field tone-new">screenName</span>
+              <span class="badge" style="--tone: var(--renamed); --tone-soft: var(--renamed-soft); margin-left: 8px">Renomeado</span></div>
+          </div>
+          <div class="dp-note">Texto do score-card renomeado. O valor também muda de formato — veja abaixo.</div>
+        </div>
+
+        <div class="dp">
+          <div class="dp-top" style="--tone: var(--adjusted)">
+            <div class="dp-side"><div class="dp-label">Valor de screenName</div>
+              <div class="valuemap"><code class="was">/napp/fatura</code><span class="arrow" style="width:24px">→</span><code class="now">/fatura</code></div>
+            </div>
+            <div class="arrow">→</div>
+            <div class="dp-side"><div class="dp-label">Regra</div>
+              <span class="badge" style="--tone: var(--adjusted); --tone-soft: var(--adjusted-soft)">Remover prefixo napp</span></div>
+          </div>
+          <div class="dp-note">Padrão do valor: <span class="pattern">/[jornada em português]/[tela em português]</span> — sem o prefixo <code style="font-family:var(--mono)">napp</code>.</div>
+        </div>
+
+        <div class="dp">
+          <div class="dp-top" style="--tone: var(--removed)">
+            <div class="dp-side"><div class="dp-label">Antes</div><span class="field old-removed">eventCategory</span></div>
+            <div class="arrow">→</div>
+            <div class="dp-side"><div class="dp-label">Depois</div>
+              <span class="badge" style="--tone: var(--removed); --tone-soft: var(--removed-soft)">Removido</span></div>
+          </div>
+          <div class="dp-note">Informação agora representada por:
+            <span class="destchips">
+              <span class="destchip">department</span><span class="destchip">macro_journey</span>
+              <span class="destchip">micro_journey</span><span class="destchip">Stream Name</span>
+            </span>
+          </div>
+        </div>
+
+        <div class="dp">
+          <div class="dp-top" style="--tone: var(--removed)">
+            <div class="dp-side"><div class="dp-label">Antes</div><span class="field old-removed">eventAction</span></div>
+            <div class="arrow">→</div>
+            <div class="dp-side"><div class="dp-label">Depois</div>
+              <span class="badge" style="--tone: var(--removed); --tone-soft: var(--removed-soft)">Removido</span></div>
+          </div>
+          <div class="dp-note">Informação agora representada por:
+            <span class="destchips">
+              <span class="destchip">component_type</span><span class="destchip">event_detail</span>
+            </span>
+          </div>
+        </div>
+
+        <div class="dp">
+          <div class="dp-top" style="--tone: var(--removed)">
+            <div class="dp-side"><div class="dp-label">Antes</div><span class="field old-removed">eventLabel</span></div>
+            <div class="arrow">→</div>
+            <div class="dp-side"><div class="dp-label">Depois</div>
+              <span class="badge" style="--tone: var(--removed); --tone-soft: var(--removed-soft)">Removido</span></div>
+          </div>
+          <div class="dp-note">Informação agora representada por:
+            <span class="destchips">
+              <span class="destchip">component_copy</span><span class="destchip">event_detail</span>
+            </span>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <section id="taxonomia">
+      <div class="sec-head">
+        <div class="sec-kicker">Parâmetros obrigatórios</div>
+        <h2>Nova taxonomia</h2>
+        <p class="sec-sub">Os conjuntos são cumulativos: interação parte da base de tela, erro acrescenta campos à interação, e a desambiguação de produto acrescenta a qualquer evento da jornada.</p>
+      </div>
+
+      <div class="taxo">
+
+        <div class="tcard">
+          <div class="tcard-head" style="--tone: var(--sv); --tone-soft: var(--sv-soft)">
+            <span class="tchip"><span class="d"></span>screen_view</span>
+            <span class="ht">Visualização de tela</span>
+            <span class="plus">Conjunto base</span>
+          </div>
+          <div class="params">
+            <div class="prow"><div class="pk">event</div><div class="pd">Tipo do evento. <div class="enums"><span class="en hl" style="--tone: var(--sv); --tone-soft: var(--sv-soft)">screen_view</span></div></div></div>
+            <div class="prow"><div class="pk">screenName</div><div class="pd">Caminho da tela, em português, sem prefixo napp. <div class="enums"><span class="en">/[jornada]/[tela]</span></div></div></div>
+            <div class="prow"><div class="pk">origin_nv</div><div class="pd">Origem do entry point. <div class="enums"><span class="en">home</span><span class="en">menu</span><span class="en">push</span><span class="en">deeplink</span></div></div></div>
+            <div class="prow"><div class="pk">event_access_type</div><div class="pd">Tipo de acesso. <div class="enums"><span class="en">vivo</span><span class="en">b2c</span><span class="en">b2b_m</span><span class="en">b2b_c</span></div></div></div>
+            <div class="prow"><div class="pk">client_category</div><div class="pd">Categoria do cliente. <div class="enums"><span class="en">admPrin</span><span class="en">adm</span><span class="en">tec</span><span class="en">cob</span><span class="en">soc</span><span class="en">b2c_not-apply</span></div></div></div>
+            <div class="prow"><div class="pk">department</div><div class="pd">Departamento — definido pela Squad. <div class="enums"><span class="en">financeiro</span><span class="en">comercial</span><span class="en">suporte</span></div></div></div>
+            <div class="prow"><div class="pk">macro_journey</div><div class="pd">Nome da jornada. <div class="enums"><span class="en">ex: Fatura</span></div></div></div>
+            <div class="prow"><div class="pk">micro_journey</div><div class="pd">Etapa dentro da jornada, com contexto. <div class="enums"><span class="en">ex: Consulta da fatura atual</span></div></div></div>
+            <div class="prow"><div class="pk">event_detail</div><div class="pd">Ação, no padrão <span class="pattern">[clique|visualizacao]_[descrição]</span>. <div class="enums"><span class="en">ex: visualizacao_detalhe_fatura</span></div></div></div>
+            <div class="prow"><div class="pk">status_journey</div><div class="pd">Status da jornada. <div class="enums"><span class="en">intencao</span><span class="en">sucesso</span><span class="en">erro</span><span class="en">progresso</span><span class="en">excecao</span></div></div></div>
+          </div>
+        </div>
+
+        <div class="tcard">
+          <div class="tcard-head" style="--tone: var(--int); --tone-soft: var(--int-soft)">
+            <span class="tchip"><span class="d"></span>interaction</span>
+            <span class="tchip" style="--tone: var(--nonint); --tone-soft: var(--nonint-soft)"><span class="d"></span>noninteraction</span>
+            <span class="ht">Interação e não interação</span>
+            <span class="plus">Base + 2 campos</span>
+          </div>
+          <div class="params">
+            <div class="prow"><div class="pk">event</div><div class="pd">Tipo do evento. <div class="enums"><span class="en hl" style="--tone: var(--int); --tone-soft: var(--int-soft)">interaction</span><span class="en hl" style="--tone: var(--nonint); --tone-soft: var(--nonint-soft)">noninteraction</span></div></div></div>
+            <div class="prow"><div class="pk">component_type</div><div class="pd">Tipo do componente, em inglês. <div class="enums"><span class="en">button</span><span class="en">card</span><span class="en">link</span><span class="en">alert</span><span class="en">banner</span><span class="en">input</span></div></div></div>
+            <div class="prow"><div class="pk">component_copy</div><div class="pd">Texto exibido na tela ou no elemento. <div class="enums"><span class="en">ex: Continuar</span></div></div></div>
+          </div>
+          <div class="dp-note">Todos os demais campos do conjunto base (<span style="font-family:var(--mono)">screenName, origin_nv, department, macro_journey, micro_journey, event_detail, status_journey…</span>) continuam obrigatórios.</div>
+        </div>
+
+        <div class="tcard">
+          <div class="tcard-head" style="--tone: var(--err); --tone-soft: var(--err-soft)">
+            <span class="tchip"><span class="d"></span>Eventos de erro</span>
+            <span class="ht">Sobre interaction / noninteraction</span>
+            <span class="plus">+ 3 campos</span>
+          </div>
+          <div class="params">
+            <div class="prow"><div class="pk">error_status</div><div class="pd">Impacto do erro no fluxo. <div class="enums"><span class="en hl" style="--tone: var(--err); --tone-soft: var(--err-soft)">bloqueado</span><span class="en hl" style="--tone: var(--err); --tone-soft: var(--err-soft)">continuar</span></div></div></div>
+            <div class="prow"><div class="pk">error_type</div><div class="pd">Natureza do erro. <div class="enums"><span class="en">usuario</span><span class="en">negocio</span><span class="en">aplicativo</span></div></div></div>
+            <div class="prow"><div class="pk">error_code</div><div class="pd">Código do erro. <div class="enums"><span class="en">ex: ST-503</span></div></div></div>
+          </div>
+          <div class="dp-note">Nos eventos de erro, o <span style="font-family:var(--mono)">status_journey</span> costuma ser <span style="font-family:var(--mono); color: var(--err)">erro</span> ou <span style="font-family:var(--mono); color: var(--err)">excecao</span>.</div>
+        </div>
+
+        <div class="tcard">
+          <div class="tcard-head" style="--tone: var(--prod); --tone-soft: var(--prod-soft)">
+            <span class="tchip"><span class="d"></span>Desambiguação de produto</span>
+            <span class="ht">Jornadas com múltiplos produtos</span>
+            <span class="plus">+ 2 campos</span>
+          </div>
+          <div class="params">
+            <div class="prow"><div class="pk">plan_name</div><div class="pd">Nome do plano. <div class="enums"><span class="en">ex: Vivo Controle 15GB</span></div></div></div>
+            <div class="prow"><div class="pk">event_plan_type</div><div class="pd">Tipo do plano. <div class="enums"><span class="en">pre</span><span class="en">pos</span><span class="en">controle</span><span class="en">fixa</span><span class="en">easy</span><span class="en">movelCorporativo</span><span class="en">fixoCorporativo</span></div></div></div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <section id="exemplos">
+      <div class="sec-head">
+        <div class="sec-kicker">Antes e depois</div>
+        <h2>Exemplos por jornada</h2>
+        <p class="sec-sub">Casos reais mostrando a estrutura antiga e a nova. Use o botão copiar para levar o conjunto novo direto para o mapa.</p>
+      </div>
+
+      <div class="ex">
+
+        <div class="excard">
+          <div class="excard-head">
+            <span class="evt-badge" style="--tone: var(--sv); --tone-soft: var(--sv-soft)"><span class="d"></span>screen_view</span>
+            <span class="jn">Fatura</span>
+            <span class="ctx">· Consulta da fatura atual</span>
+            <span class="dept-pill">department: financeiro</span>
+          </div>
+          <div class="cols">
+            <div class="col before">
+              <div class="col-head"><span class="ttl">Antes · App 4</span></div>
+              <div class="kv">
+                <div class="p"><span class="k">name</span><span class="v">screen_view</span></div>
+                <div class="p chg"><span class="k">sn</span><span class="v">/napp/fatura</span></div>
+                <div class="p gone"><span class="k">eventCategory</span><span class="v">b2c_ecare_napp_fatura</span></div>
+              </div>
+            </div>
+            <div class="col after">
+              <div class="col-head"><span class="ttl">Depois · App 5.0</span><button class="copy">Copiar</button></div>
+              <div class="kv" data-copy>
+                <div class="p"><span class="k">event</span><span class="v">screen_view</span></div>
+                <div class="p chg"><span class="k">screenName</span><span class="v">/fatura/detalhe-da-fatura</span></div>
+                <div class="p"><span class="k">origin_nv</span><span class="v">home</span></div>
+                <div class="p"><span class="k">event_access_type</span><span class="v">b2c</span></div>
+                <div class="p"><span class="k">client_category</span><span class="v">b2c_not-apply</span></div>
+                <div class="p add"><span class="k">department</span><span class="v">financeiro</span></div>
+                <div class="p add"><span class="k">macro_journey</span><span class="v">Fatura</span></div>
+                <div class="p add"><span class="k">micro_journey</span><span class="v">Consulta da fatura atual</span></div>
+                <div class="p add"><span class="k">event_detail</span><span class="v">visualizacao_detalhe_fatura</span></div>
+                <div class="p add"><span class="k">status_journey</span><span class="v">sucesso</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="excard">
+          <div class="excard-head">
+            <span class="evt-badge" style="--tone: var(--int); --tone-soft: var(--int-soft)"><span class="d"></span>interaction</span>
+            <span class="jn">Recarga</span>
+            <span class="ctx">· Clique em “Continuar” na seleção de valor</span>
+            <span class="dept-pill">department: comercial</span>
+          </div>
+          <div class="cols">
+            <div class="col before">
+              <div class="col-head"><span class="ttl">Antes · App 4</span></div>
+              <div class="kv">
+                <div class="p"><span class="k">name</span><span class="v">interaction</span></div>
+                <div class="p chg"><span class="k">sn</span><span class="v">/napp/recarga</span></div>
+                <div class="p gone"><span class="k">eventCategory</span><span class="v">b2c_ecare_napp_recarga</span></div>
+                <div class="p gone"><span class="k">eventAction</span><span class="v">screen_click_button</span></div>
+                <div class="p gone"><span class="k">eventLabel</span><span class="v">continuar_recarga</span></div>
+              </div>
+            </div>
+            <div class="col after">
+              <div class="col-head"><span class="ttl">Depois · App 5.0</span><button class="copy">Copiar</button></div>
+              <div class="kv" data-copy>
+                <div class="p"><span class="k">event</span><span class="v">interaction</span></div>
+                <div class="p chg"><span class="k">screenName</span><span class="v">/recarga/valor-da-recarga</span></div>
+                <div class="p"><span class="k">origin_nv</span><span class="v">home</span></div>
+                <div class="p"><span class="k">event_access_type</span><span class="v">b2c</span></div>
+                <div class="p"><span class="k">client_category</span><span class="v">b2c_not-apply</span></div>
+                <div class="p add"><span class="k">department</span><span class="v">comercial</span></div>
+                <div class="p add"><span class="k">macro_journey</span><span class="v">Recarga</span></div>
+                <div class="p add"><span class="k">micro_journey</span><span class="v">Seleção do valor de recarga</span></div>
+                <div class="p add"><span class="k">event_detail</span><span class="v">clique_continuar_recarga</span></div>
+                <div class="p add"><span class="k">status_journey</span><span class="v">progresso</span></div>
+                <div class="p add"><span class="k">component_type</span><span class="v">button</span></div>
+                <div class="p add"><span class="k">component_copy</span><span class="v">Continuar</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="excard">
+          <div class="excard-head">
+            <span class="evt-badge" style="--tone: var(--nonint); --tone-soft: var(--nonint-soft)"><span class="d"></span>noninteraction</span>
+            <span class="evt-badge" style="--tone: var(--err); --tone-soft: var(--err-soft)"><span class="d"></span>erro</span>
+            <span class="jn">Suporte Técnico</span>
+            <span class="ctx">· Falha no diagnóstico automático</span>
+            <span class="dept-pill">department: suporte</span>
+          </div>
+          <div class="cols">
+            <div class="col before">
+              <div class="col-head"><span class="ttl">Antes · App 4</span></div>
+              <div class="kv">
+                <div class="p"><span class="k">name</span><span class="v">noninteraction</span></div>
+                <div class="p chg"><span class="k">sn</span><span class="v">/napp/suporte-tecnico</span></div>
+                <div class="p gone"><span class="k">eventCategory</span><span class="v">b2c_ecare_napp_suporte</span></div>
+                <div class="p gone"><span class="k">eventAction</span><span class="v">screen_view_error</span></div>
+                <div class="p gone"><span class="k">eventLabel</span><span class="v">app&amp;blocker&amp;falha_diagnostico</span></div>
+              </div>
+            </div>
+            <div class="col after">
+              <div class="col-head"><span class="ttl">Depois · App 5.0</span><button class="copy">Copiar</button></div>
+              <div class="kv" data-copy>
+                <div class="p"><span class="k">event</span><span class="v">noninteraction</span></div>
+                <div class="p chg"><span class="k">screenName</span><span class="v">/suporte-tecnico/diagnostico</span></div>
+                <div class="p"><span class="k">origin_nv</span><span class="v">menu</span></div>
+                <div class="p"><span class="k">event_access_type</span><span class="v">b2c</span></div>
+                <div class="p"><span class="k">client_category</span><span class="v">b2c_not-apply</span></div>
+                <div class="p add"><span class="k">department</span><span class="v">suporte</span></div>
+                <div class="p add"><span class="k">macro_journey</span><span class="v">Suporte Técnico</span></div>
+                <div class="p add"><span class="k">micro_journey</span><span class="v">Diagnóstico automático da conexão</span></div>
+                <div class="p add"><span class="k">event_detail</span><span class="v">visualizacao_erro_diagnostico</span></div>
+                <div class="p add"><span class="k">status_journey</span><span class="v">erro</span></div>
+                <div class="p add"><span class="k">component_type</span><span class="v">alert</span></div>
+                <div class="p add"><span class="k">component_copy</span><span class="v">Não foi possível concluir o diagnóstico</span></div>
+                <div class="p add"><span class="k">error_status</span><span class="v">bloqueado</span></div>
+                <div class="p add"><span class="k">error_type</span><span class="v">aplicativo</span></div>
+                <div class="p add"><span class="k">error_code</span><span class="v">ST-503</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="excard">
+          <div class="excard-head">
+            <span class="evt-badge" style="--tone: var(--int); --tone-soft: var(--int-soft)"><span class="d"></span>interaction</span>
+            <span class="evt-badge" style="--tone: var(--prod); --tone-soft: var(--prod-soft)"><span class="d"></span>desambiguação</span>
+            <span class="jn">Troca de Plano</span>
+            <span class="ctx">· Seleção de um plano na vitrine</span>
+            <span class="dept-pill">department: comercial</span>
+          </div>
+          <div class="cols">
+            <div class="col before">
+              <div class="col-head"><span class="ttl">Antes · App 4</span></div>
+              <div class="kv">
+                <div class="p"><span class="k">name</span><span class="v">interaction</span></div>
+                <div class="p chg"><span class="k">sn</span><span class="v">/napp/troca-de-plano</span></div>
+                <div class="p gone"><span class="k">eventCategory</span><span class="v">b2c_ecare_napp_planos</span></div>
+                <div class="p gone"><span class="k">eventAction</span><span class="v">screen_click_card</span></div>
+                <div class="p gone"><span class="k">eventLabel</span><span class="v">plano_controle</span></div>
+              </div>
+            </div>
+            <div class="col after">
+              <div class="col-head"><span class="ttl">Depois · App 5.0</span><button class="copy">Copiar</button></div>
+              <div class="kv" data-copy>
+                <div class="p"><span class="k">event</span><span class="v">interaction</span></div>
+                <div class="p chg"><span class="k">screenName</span><span class="v">/troca-de-plano/planos-disponiveis</span></div>
+                <div class="p"><span class="k">origin_nv</span><span class="v">home</span></div>
+                <div class="p"><span class="k">event_access_type</span><span class="v">b2c</span></div>
+                <div class="p"><span class="k">client_category</span><span class="v">b2c_not-apply</span></div>
+                <div class="p add"><span class="k">department</span><span class="v">comercial</span></div>
+                <div class="p add"><span class="k">macro_journey</span><span class="v">Troca de Plano</span></div>
+                <div class="p add"><span class="k">micro_journey</span><span class="v">Seleção do novo plano</span></div>
+                <div class="p add"><span class="k">event_detail</span><span class="v">clique_selecionar_plano</span></div>
+                <div class="p add"><span class="k">status_journey</span><span class="v">intencao</span></div>
+                <div class="p add"><span class="k">component_type</span><span class="v">card</span></div>
+                <div class="p add"><span class="k">component_copy</span><span class="v">Vivo Controle 15GB</span></div>
+                <div class="p add"><span class="k">plan_name</span><span class="v">Vivo Controle 15GB</span></div>
+                <div class="p add"><span class="k">event_plan_type</span><span class="v">controle</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="footnote">
+        <h3>Observações</h3>
+        <ul>
+          <li><strong>Parâmetros adicionais por jornada:</strong> podem existir campos específicos de determinadas jornadas, definidos caso a caso.</li>
+          <li><strong>E-commerce:</strong> as definições dos eventos de e-commerce serão compartilhadas nos próximos comunicados.</li>
+          <li><strong>department:</strong> o valor é definido pela Squad responsável pela jornada.</li>
+          <li><strong>Stream Name:</strong> um dos destinos da informação que estava em <span style="font-family:var(--mono)">eventCategory</span>, junto de department, macro_journey e micro_journey.</li>
+        </ul>
+      </div>
+
+      <p class="credit">Guia de consulta · Nova taxonomia de tagueamento do App 5.0 · Vivo</p>
+    </section>
+
+  </main>
+
+<script>
+(function () {
+  var root = document.documentElement;
+  var btn = document.getElementById('themeBtn');
+  var icon = document.getElementById('themeIcon');
+  var label = document.getElementById('themeLabel');
+  function current() {
+    var attr = root.getAttribute('data-theme');
+    if (attr) return attr;
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  }
+  function paint() {
+    var t = current();
+    icon.textContent = t === 'dark' ? '☀' : '☾';
+    label.textContent = t === 'dark' ? 'Claro' : 'Escuro';
+  }
+  btn.addEventListener('click', function () {
+    var next = current() === 'dark' ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    paint();
+  });
+  paint();
+
+  document.querySelectorAll('.copy').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var block = b.closest('.col').querySelector('[data-copy]');
+      if (!block) return;
+      var lines = [];
+      block.querySelectorAll('.p').forEach(function (p) {
+        var k = p.querySelector('.k').textContent.trim();
+        var v = p.querySelector('.v').textContent.trim();
+        lines.push(k + ': ' + v);
+      });
+      navigator.clipboard.writeText(lines.join('\n')).then(function () {
+        var old = b.textContent;
+        b.textContent = '✓ Copiado';
+        b.classList.add('done');
+        setTimeout(function () { b.textContent = old; b.classList.remove('done'); }, 1600);
+      });
+    });
+  });
+
+  var links = Array.prototype.slice.call(document.querySelectorAll('nav.jump a'));
+  var map = {};
+  links.forEach(function (a) { map[a.getAttribute('href').slice(1)] = a; });
+  var obs = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      if (e.isIntersecting) {
+        links.forEach(function (l) { l.classList.remove('active'); });
+        if (map[e.target.id]) map[e.target.id].classList.add('active');
+      }
+    });
+  }, { rootMargin: '-45% 0px -50% 0px' });
+  document.querySelectorAll('section[id]').forEach(function (s) { obs.observe(s); });
+})();
+</script>
+</body>
+</html>
