@@ -3,9 +3,10 @@
 Wraps the current-generation builders in tagmatch.query_builders (NOT the
 legacy tagmatch.query_builder.QueryBuilder). All builders are pure:
 df_spec + options -> {"query": SQL, "event_mapping", "metadata", ...}.
-User-controlled strings that reach SQL as raw text - the table name, the
-dates, and the custom type's output columns and filter field names - are
-all validated here before any builder is called.
+User-controlled strings that reach SQL as raw text - the table name and the
+dates - are validated here before any builder is called. The custom query
+type's own payload (columns, operators, values) is validated inside
+api._lib.custom_query.build_custom_query.
 """
 import io
 import json
@@ -13,52 +14,14 @@ import re
 
 import numpy as np
 import pandas as pd
+from api._lib.custom_query import build_custom_query
 from tagmatch.databricks_schema import DEFAULT_SCHEMA_CONFIG, validate_table_name
-from tagmatch.query_builders.custom_builder import CustomQueryBuilder
 from tagmatch.query_builders.validation_builder import ValidationQueryBuilder
 from tagmatch.query_builders.volumetry_builder import VolumetryQueryBuilder
 
 VALID_QUERY_TYPES = ("validation", "volumetry", "funnel", "custom")
 
 _DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
-
-_IDENTIFIER_RE = re.compile(r"^[A-Za-z0-9_]+$")
-
-# Spec fields the custom builder maps to Silver columns - mirrors the
-# platform frontend's FILTER_FIELDS (CustomQueryPanel.tsx:49). Anything
-# else would fall through the builder's mapping .get(field, field)
-# fallbacks and land in SQL as a raw identifier.
-# KEEP IN SYNC with FILTER_FIELDS in app/build-query/CustomOptions.tsx -
-# the two lists are hand-maintained; this one is the security gate (a
-# field here that the UI omits just hides an option; a field the UI adds
-# but this omits fails generation with "Invalid filter field").
-VALID_FILTER_FIELDS = (
-    "sn", "ct", "ac", "lb",
-    "component_copy", "component_type", "module_name", "item_name", "item_id",
-)
-
-
-def _validated_custom_inputs(options: dict):
-    raw_columns = options.get("output_columns", [])
-    if not isinstance(raw_columns, list):
-        raise ValueError("output_columns must be a list.")
-    output_columns = [str(c) for c in raw_columns]
-    for col in output_columns:
-        if not _IDENTIFIER_RE.match(col):
-            raise ValueError(f"Invalid output column: '{col}'.")
-    filter_fields = options.get("filter_fields_per_event", {})
-    if not isinstance(filter_fields, dict):
-        raise ValueError("filter_fields_per_event must be an object.")
-    validated_filters = {}
-    for order, fields in filter_fields.items():
-        if not isinstance(fields, list):
-            raise ValueError("Each filter_fields_per_event value must be a list.")
-        clean = [str(f) for f in fields]
-        for f in clean:
-            if f not in VALID_FILTER_FIELDS:
-                raise ValueError(f"Invalid filter field: '{f}'. Must be one of {VALID_FILTER_FIELDS}.")
-        validated_filters[str(order)] = clean
-    return output_columns, validated_filters
 
 
 def _sanitize(obj):
@@ -180,17 +143,16 @@ def build_query(events: list, query_type: str, options: dict) -> dict:
                 count_mode=count_mode,
             )
         else:  # custom
-            output_columns, filter_fields = _validated_custom_inputs(options)
-            builder = CustomQueryBuilder(schema_config=schema_config)
-            result = builder.build_custom_query(
-                df,
+            payload = options.get("custom")
+            if not isinstance(payload, dict):
+                raise ValueError("Missing custom query configuration.")
+            result = build_custom_query(
+                payload,
                 start_date,
                 end_date=end_date,
-                selected_event_orders=[int(o) for o in options.get("selected_event_orders", [])],
-                filter_fields_per_event=filter_fields,
-                output_columns=output_columns,
-                count_mode=count_mode,
+                schema_config=schema_config,
             )
+            result = {"query": result["query"], "event_mapping": {}, "metadata": result["metadata"]}
     except ValueError as e:
         return {"ok": False, "error": str(e)}
     except Exception as e:

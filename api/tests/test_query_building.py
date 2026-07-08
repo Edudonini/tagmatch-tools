@@ -149,24 +149,88 @@ def test_funnel_query():
 
 # --- build_query: custom ---
 
-def test_custom_query():
+def test_build_query_custom_count_sessions():
     result = build_query(
-        _events(),
+        [],
         "custom",
         {
-            **BASE_OPTIONS,
-            "selected_event_orders": [1, 2],
-            "filter_fields_per_event": {"1": ["sn"], "2": ["ac", "lb"]},
-            "output_columns": ["event_name", "screenName"],
+            "start_date": "2026-01-01",
+            "end_date": "2026-01-31",
+            "custom": {
+                "output_mode": "count_sessions",
+                "match": "and",
+                "conditions": [{"column": "event_name", "op": "eq", "value": "interaction"}],
+            },
         },
     )
     assert result["ok"] is True
-    assert result["metadata"]["events_selected"] == 2
-    q = result["query"]
-    assert "THEN 'spec_1'" in q
-    assert "THEN 'spec_2'" in q
-    assert "screenName" in q
-    assert "FROM ecare_silver.b2c_ga4.silver_ga4_novo_app" in q
+    assert "COUNT(DISTINCT ga_session_id) AS session_count" in result["query"]
+    assert result["event_mapping"] == {}
+    assert result["metadata"]["output_mode"] == "count_sessions"
+
+
+def test_build_query_custom_extract_with_session_scope():
+    result = build_query(
+        [],
+        "custom",
+        {
+            "start_date": "2026-01-01",
+            "end_date": "2026-01-31",
+            "custom": {
+                "output_mode": "extract",
+                "match": "and",
+                "conditions": [{"column": "screenName", "op": "eq", "value": "/napp/fatura"}],
+                "session_scope": {
+                    "match": "and",
+                    "conditions": [{"column": "screenName", "op": "eq", "value": "/napp/home"}],
+                },
+                "output_columns": ["event_name", "screenName"],
+                "limit": 100,
+            },
+        },
+    )
+    assert result["ok"] is True
+    assert "ga_session_id IN (SELECT ga_session_id FROM" in result["query"]
+    assert "LIMIT 100" in result["query"]
+
+
+def test_build_query_custom_rejects_unknown_column_as_400_not_500():
+    result = build_query(
+        [],
+        "custom",
+        {
+            "start_date": "2026-01-01",
+            "end_date": "2026-01-31",
+            "custom": {
+                "output_mode": "count_sessions",
+                "match": "and",
+                "conditions": [{"column": "evil; DROP TABLE x", "op": "eq", "value": "1"}],
+            },
+        },
+    )
+    assert result["ok"] is False
+    assert "Unknown column" in result["error"]
+
+
+def test_build_query_custom_missing_payload_errors_cleanly():
+    result = build_query([], "custom", {"start_date": "2026-01-01", "end_date": "2026-01-31"})
+    assert result["ok"] is False
+    assert result["error"]  # a non-empty user-readable message, not a crash
+
+
+def test_build_query_custom_uses_table_override():
+    result = build_query(
+        [],
+        "custom",
+        {
+            "start_date": "2026-01-01",
+            "end_date": "2026-01-31",
+            "table_name": "cat.sch.tbl",
+            "custom": {"output_mode": "count_events", "match": "and", "conditions": []},
+        },
+    )
+    assert result["ok"] is True
+    assert "FROM cat.sch.tbl" in result["query"]
 
 
 # --- table override + validation ---
@@ -182,31 +246,6 @@ def test_invalid_table_name_rejected():
     result = build_query(_events(), "validation", {**BASE_OPTIONS, "table_name": "bad; DROP TABLE x"})
     assert result["ok"] is False
     assert "table" in result["error"].lower()
-
-
-def test_custom_rejects_injected_output_column():
-    result = build_query(
-        _events(),
-        "custom",
-        {**BASE_OPTIONS, "selected_event_orders": [1], "output_columns": ["event_name, (SELECT 1) --"]},
-    )
-    assert result["ok"] is False
-    assert "output column" in result["error"].lower()
-
-
-def test_custom_rejects_injected_filter_field():
-    result = build_query(
-        _events(),
-        "custom",
-        {
-            **BASE_OPTIONS,
-            "selected_event_orders": [1],
-            "filter_fields_per_event": {"1": ["sn); DROP TABLE x; --"]},
-            "output_columns": ["event_name"],
-        },
-    )
-    assert result["ok"] is False
-    assert "filter field" in result["error"].lower()
 
 
 # --- error paths ---
