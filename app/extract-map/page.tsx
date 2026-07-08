@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { ResultsPanel } from "../_lib/ResultsPanel";
 import { ReviewMode } from "./review/ReviewMode";
 import { MapView } from "./mapview/MapView";
 import { clearSvgCropCache } from "./review/useSvgCropUrl";
@@ -11,7 +10,7 @@ type ExtractResult =
   | { ok: true; spec: Record<string, unknown>[]; report: Record<string, unknown> }
   | { ok: false; error: string };
 
-type View = "table" | "review" | "map";
+type View = "map" | "review";
 
 export default function ExtractMapPage() {
   const [file, setFile] = useState<File | null>(null);
@@ -19,14 +18,14 @@ export default function ExtractMapPage() {
   const [result, setResult] = useState<ExtractResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [svgContent, setSvgContent] = useState<string | null>(null);
-  const [view, setView] = useState<View>("table");
+  const [view, setView] = useState<View>("map");
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!file) return;
     setLoading(true);
     setResult(null);
-    setView("table");
+    setView("map");
     clearSvgCropCache();
     const text = await file.text();
     setSvgContent(text);
@@ -83,28 +82,8 @@ export default function ExtractMapPage() {
         <p className="alert-error">Couldn&apos;t extract a spec: {result.error}</p>
       )}
 
-      {result && result.ok && view === "table" && (
-        <>
-          <div className="review-entry-bar">
-            <button className="btn btn-ghost" onClick={() => setView("map")}>
-              Map view →
-            </button>
-            <button className="btn btn-ghost" onClick={() => setView("review")}>
-              Review events →
-            </button>
-          </div>
-          <ResultsPanel
-            rows={result.spec}
-            report={result.report}
-            entityLabel="Spec"
-            badgeColumn="name"
-            downloadBaseName="spec"
-          />
-        </>
-      )}
-
       {result && result.ok && view === "map" && (
-        <MapView rows={result.spec} onExit={() => setView("table")} />
+        <MapView rows={result.spec} report={result.report} onReview={() => setView("review")} />
       )}
 
       {result && result.ok && view === "review" && (
@@ -112,7 +91,7 @@ export default function ExtractMapPage() {
           rows={result.spec}
           svgContent={svgContent}
           onChange={(newRows) => setResult({ ...result, spec: newRows })}
-          onExit={() => setView("table")}
+          onExit={() => setView("map")}
         />
       )}
     </main>
