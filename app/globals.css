@@ -774,19 +774,6 @@ tbody tr:hover {
   gap: 12px;
 }
 
-.qb-custom-event {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.qb-filter-fields {
-  display: flex;
-  gap: 14px;
-  flex-wrap: wrap;
-  padding-left: 26px;
-}
-
 .qb-columns-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
@@ -1064,3 +1051,25 @@ tbody tr:hover {
 @media (prefers-reduced-motion: reduce) {
   .handoff-spinner { animation: none; }
 }
+
+/* Custom query builder (four-block condition builder) */
+.qb-cb-block { border: 1px solid var(--border, rgba(128,128,128,0.25)); border-radius: 10px; padding: 14px 16px; margin-top: 14px; }
+.qb-cb-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+.qb-seg { display: inline-flex; border: 1px solid rgba(128,128,128,0.3); border-radius: 8px; overflow: hidden; }
+.qb-seg-btn { padding: 7px 14px; font-size: 13px; background: transparent; border: none; cursor: pointer; color: inherit; }
+.qb-seg-btn.on { background: #5b8cff; color: #fff; font-weight: 600; }
+.qb-cond-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+.qb-cond-col, .qb-cond-op { font-family: ui-monospace, Menlo, monospace; font-size: 12px; padding: 6px 8px; border-radius: 7px; }
+.qb-cond-val { min-width: 160px; }
+.qb-cond-x { opacity: 0.5; background: none; border: none; cursor: pointer; color: inherit; font-size: 13px; }
+.qb-cond-x:hover { opacity: 1; }
+.qb-cb-actions { display: flex; align-items: center; gap: 14px; margin-top: 6px; }
+.qb-add { font-size: 13px; color: #5b8cff; background: none; border: none; cursor: pointer; padding: 0; }
+.qb-chip { font-family: ui-monospace, monospace; font-size: 12px; padding: 4px 10px; border-radius: 999px; background: rgba(91,140,255,0.14); color: #5b8cff; border: none; cursor: pointer; }
+.qb-andor { display: inline-flex; border: 1px solid rgba(128,128,128,0.3); border-radius: 999px; overflow: hidden; font-family: ui-monospace, monospace; font-size: 11px; }
+.qb-andor-btn { padding: 3px 12px; background: none; border: none; cursor: pointer; color: inherit; }
+.qb-andor-btn.on { background: rgba(91,140,255,0.2); color: #5b8cff; font-weight: 700; }
+.qb-limit-field { display: block; margin-top: 12px; max-width: 180px; }
+.qb-hint { font-size: 11px; opacity: 0.55; margin-top: 6px; }
+.qb-cond-err { font-size: 11px; color: var(--error); margin-left: 2px; }
+.qb-cond-val--invalid { border-color: var(--error); }
