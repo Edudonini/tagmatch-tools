@@ -6,7 +6,8 @@ import { badgeClass, badgeLabel } from "../_lib/ResultsPanel";
 import { takeSpecHandoff, rowsToSpecFile } from "../_lib/specHandoff";
 import {
   CustomOptions,
-  DEFAULT_OUTPUT_COLUMNS,
+  INITIAL_CUSTOM_STATE,
+  buildCustomPayload,
   type CustomOptionsState,
   type SpecEvent,
 } from "./CustomOptions";
@@ -46,11 +47,7 @@ export default function BuildQueryPage() {
   const [groupBy, setGroupBy] = useState("event");
   const [includeEventCount, setIncludeEventCount] = useState(true);
   const [screenOrder, setScreenOrder] = useState<string[]>([]);
-  const [customOptions, setCustomOptions] = useState<CustomOptionsState>({
-    selectedOrders: [],
-    filterFields: {},
-    outputColumns: [...DEFAULT_OUTPUT_COLUMNS],
-  });
+  const [customOptions, setCustomOptions] = useState<CustomOptionsState>({ ...INITIAL_CUSTOM_STATE });
   const [tableName, setTableName] = useState(DEFAULT_TABLE);
 
   const [result, setResult] = useState<GenerateResult | null>(null);
@@ -70,7 +67,7 @@ export default function BuildQueryPage() {
     setParseError(null);
     setResult(null);
     setScreenOrder([]);
-    setCustomOptions({ selectedOrders: [], filterFields: {}, outputColumns: [...DEFAULT_OUTPUT_COLUMNS] });
+    setCustomOptions({ ...INITIAL_CUSTOM_STATE });
     if (!selected) return;
     setParsing(true);
     const formData = new FormData();
@@ -133,9 +130,7 @@ export default function BuildQueryPage() {
     }
     if (queryType === "funnel") options.screen_order = screenOrder;
     if (queryType === "custom") {
-      options.selected_event_orders = customOptions.selectedOrders;
-      options.filter_fields_per_event = customOptions.filterFields;
-      options.output_columns = customOptions.outputColumns;
+      options.custom = buildCustomPayload(customOptions);
     }
     const formData = new FormData();
     formData.append("file", file);
@@ -172,8 +167,7 @@ export default function BuildQueryPage() {
   const generateDisabled =
     !events ||
     generating ||
-    (queryType === "funnel" && funnelDisabled) ||
-    (queryType === "custom" && customOptions.selectedOrders.length === 0);
+    (queryType === "funnel" && funnelDisabled);
 
   return (
     <main className="shell">
