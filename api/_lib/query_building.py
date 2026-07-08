@@ -106,6 +106,18 @@ def parse_spec_file(filename: str, content: bytes) -> list:
         raise ValueError("The spec file has no 'name' column - is this a Map Extraction output?")
 
     df = df.fillna("")
+    # Normalize event_order to a valid 1-based int. A spec straight from Map
+    # Extraction can carry events with no event_order (a null that fillna("")
+    # above turned into ""), and every query builder does int(event_order).
+    # The builders guard with pd.notna() and fall back to idx+1, but "" is not
+    # NaN so that guard is defeated and int("") raises. Backfill the same
+    # idx+1 fallback here so every builder receives a clean int.
+    if "event_order" not in df.columns:
+        df["event_order"] = range(1, len(df) + 1)
+    else:
+        orders = pd.to_numeric(df["event_order"], errors="coerce")
+        df["event_order"] = [int(o) if pd.notna(o) else i + 1 for i, o in enumerate(orders)]
+
     return _sanitize(df.to_dict(orient="records"))
 
 

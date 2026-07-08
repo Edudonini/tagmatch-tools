@@ -21,6 +21,36 @@ def _events():
 BASE_OPTIONS = {"start_date": "2026-07-01", "end_date": "2026-07-06", "count_mode": "session"}
 
 
+# --- event_order normalization (regression: real maps can have events with no
+# event_order; the builders int() it, and a blanket fillna("") turned the
+# missing value into "" which defeated their pd.notna guard -> int("")). ---
+
+def test_parse_normalizes_missing_event_order_to_int():
+    spec = [
+        {"name": "screen_view", "event_order": 1, "sn": "/napp/home", "ct": "b2c_ecare_napp"},
+        {"name": "interaction", "event_order": None, "sn": "/napp/home", "ac": "screen_click_button", "lb": "btn"},
+    ]
+    events = parse_spec_file("spec.json", json.dumps(spec).encode())
+    assert events[0]["event_order"] == 1
+    # missing event_order backfilled to a valid 1-based int (idx+1), not ""
+    assert events[1]["event_order"] == 2
+    assert isinstance(events[1]["event_order"], int)
+
+
+def test_build_query_with_missing_event_order_succeeds():
+    spec = [
+        {"name": "screen_view", "event_order": 1, "sn": "/napp/home", "ct": "b2c_ecare_napp",
+         "sn_regex": "^/napp/home$", "ct_regex": "^b2c_ecare_napp$"},
+        {"name": "interaction", "event_order": None, "sn": "/napp/home", "ct": "b2c_ecare_napp",
+         "ac": "screen_click_button", "lb": "btn", "sn_regex": "^/napp/home$",
+         "ac_regex": "^screen_click_button$", "lb_regex": "^btn$", "ct_regex": "^b2c_ecare_napp$"},
+    ]
+    events = parse_spec_file("spec.json", json.dumps(spec).encode())
+    result = build_query(events, "validation", BASE_OPTIONS)
+    assert result["ok"] is True, result.get("error")
+    assert "2" in result["event_mapping"]
+
+
 # --- parse_spec_file ---
 
 def test_parse_json():
