@@ -71,7 +71,7 @@ export function ReviewMode({ rows, svgContent, onChange, onExit }: ReviewModePro
             + Add event
           </button>
           <button className="btn btn-ghost" onClick={onExit}>
-            Back to table
+            Back to map
           </button>
         </div>
       </div>
@@ -89,7 +89,7 @@ export function ReviewMode({ rows, svgContent, onChange, onExit }: ReviewModePro
             + Add event
           </button>
           <button className="btn btn-ghost" onClick={onExit}>
-            Back to table
+            Back to map
           </button>
         </div>
       </div>
