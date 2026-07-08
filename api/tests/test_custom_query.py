@@ -344,3 +344,45 @@ def test_custom_table_name_used():
                            "2026-01-01", end_date="2026-01-31",
                            schema_config={"table_name": "cat.sch.tbl"})["query"]
     assert "FROM cat.sch.tbl" in q
+
+
+# --- restored branch coverage (test-only, v2 shape) ---
+
+def test_compile_group_or_joiner_within_group():
+    out = _compile_group(_grp([
+        {"column": "event_name", "op": "eq", "value": "interaction"},
+        {"column": "event_name", "op": "eq", "value": "screen_view"},
+    ], match="or"))
+    assert out == "(event_name = 'interaction' OR event_name = 'screen_view')"
+
+
+def test_compile_filter_invalid_match_rejected():
+    with pytest.raises(ValueError, match="match"):
+        _compile_filter({"match": "nand", "groups": [_grp([{"column": "event_name", "op": "eq", "value": "x"}])]})
+
+
+def test_extract_custom_output_columns_and_limit():
+    q = build_custom_query({"output_mode": "extract", "filter": _filter([_grp([])]),
+                            "output_columns": ["event_name", "screenName"], "limit": 50},
+                           "2026-01-01", end_date="2026-01-31")["query"]
+    assert "SELECT event_name, screenName" in q
+    assert "LIMIT 50" in q
+
+
+def test_extract_output_column_validated():
+    with pytest.raises(ValueError, match="Unknown column"):
+        build_custom_query({"output_mode": "extract", "filter": _filter([_grp([])]),
+                            "output_columns": ["event_name", "evil"]},
+                           "2026-01-01", end_date="2026-01-31")
+
+
+def test_extract_limit_floor_is_one():
+    q = build_custom_query({"output_mode": "extract", "filter": _filter([_grp([])]), "limit": 0},
+                           "2026-01-01", end_date="2026-01-31")["query"]
+    assert "LIMIT 1" in q
+
+
+def test_date_filter_start_only():
+    q = build_custom_query({"output_mode": "count_sessions", "filter": _filter([_grp([])])},
+                           "2026-01-01", end_date=None)["query"]
+    assert "WHERE data >= '2026-01-01'" in q
