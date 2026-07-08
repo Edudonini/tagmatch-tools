@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { badgeClass, badgeLabel } from "../_lib/ResultsPanel";
+import { takeSpecHandoff, rowsToSpecFile } from "../_lib/specHandoff";
 import {
   CustomOptions,
   DEFAULT_OUTPUT_COLUMNS,
@@ -34,6 +35,7 @@ export default function BuildQueryPage() {
   const [events, setEvents] = useState<SpecEvent[] | null>(null);
   const [parseError, setParseError] = useState<string | null>(null);
   const [parsing, setParsing] = useState(false);
+  const [fromHandoff, setFromHandoff] = useState(false);
 
   const [queryType, setQueryType] = useState<string>("validation");
   const [startDate, setStartDate] = useState(() => isoDaysAgo(7));
@@ -61,6 +63,7 @@ export default function BuildQueryPage() {
   }, {});
 
   async function handleFileChange(selected: File | null) {
+    setFromHandoff(false);
     setFile(selected);
     setEvents(null);
     setParseError(null);
@@ -92,6 +95,14 @@ export default function BuildQueryPage() {
       setParsing(false);
     }
   }
+
+  useEffect(() => {
+    const rows = takeSpecHandoff();
+    if (rows && rows.length > 0) {
+      handleFileChange(rowsToSpecFile(rows)).then(() => setFromHandoff(true));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function moveScreen(index: number, delta: number) {
     const target = index + delta;
@@ -184,6 +195,10 @@ export default function BuildQueryPage() {
         <span className="file-name">{file ? file.name : "No file chosen"}</span>
         {parsing && <span className="qb-parsing">Parsing…</span>}
       </div>
+
+      {fromHandoff && events && (
+        <p className="handoff-banner">Spec carregado da Extração de Mapa · {events.length} eventos.</p>
+      )}
 
       {parseError && <p className="alert-error">Couldn&apos;t read the spec: {parseError}</p>}
 

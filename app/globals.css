@@ -1026,3 +1026,16 @@ tbody tr:hover {
   .mv-toolbar { justify-content: stretch; }
   .mv-p { grid-template-columns: 1fr; gap: 0; }
 }
+
+/* Handoff banner (spec carried in from Map Extraction) */
+
+.handoff-banner {
+  margin-top: 16px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  font-size: 13px;
+  font-family: var(--font-mono), ui-monospace, monospace;
+}

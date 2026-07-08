@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ResultsPanel, type ResultRow } from "../_lib/ResultsPanel";
 import { MatchDetailDrawer, type MatchRow } from "./MatchDetailDrawer";
+import { takeSpecHandoff, rowsToSpecFile } from "../_lib/specHandoff";
 
 type MatchResult =
   | {
@@ -29,6 +30,15 @@ export default function MatchPage() {
   const [result, setResult] = useState<MatchResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [drawerRow, setDrawerRow] = useState<MatchRow | null>(null);
+  const [fromHandoff, setFromHandoff] = useState(false);
+
+  useEffect(() => {
+    const rows = takeSpecHandoff();
+    if (rows && rows.length > 0) {
+      setSpecFile(rowsToSpecFile(rows));
+      setFromHandoff(true);
+    }
+  }, []);
 
   async function handleMatch() {
     if (!specFile || !logsFile) return;
@@ -72,7 +82,14 @@ export default function MatchPage() {
 
       <div className="panel control-panel">
         <label className="file-input-label">
-          <input type="file" accept=".json,.csv" onChange={(e) => setSpecFile(e.target.files?.[0] ?? null)} />
+          <input
+            type="file"
+            accept=".json,.csv"
+            onChange={(e) => {
+              setSpecFile(e.target.files?.[0] ?? null);
+              setFromHandoff(false);
+            }}
+          />
           Choose spec
         </label>
         <span className="file-name">{specFile ? specFile.name : "No spec chosen"}</span>
@@ -85,6 +102,10 @@ export default function MatchPage() {
           {loading ? "Matching…" : "Match →"}
         </button>
       </div>
+
+      {fromHandoff && specFile && (
+        <p className="handoff-banner">Spec carregado da Extração de Mapa.</p>
+      )}
 
       {result && !result.ok && <p className="alert-error">Couldn&apos;t run matching: {result.error}</p>}
 
