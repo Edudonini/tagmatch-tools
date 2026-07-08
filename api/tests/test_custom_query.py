@@ -34,8 +34,29 @@ def test_eq_escapes_single_quote_injection():
     assert out == "screenName = 'x'' OR ''1''=''1'"
 
 
+def test_eq_escapes_trailing_backslash():
+    out = _compile_condition({"column": "event_name", "op": "eq", "value": "x\\"})
+    assert out == "event_name = 'x\\\\'"  # backslash doubled inside the literal
+
+
 def test_neq():
     assert _compile_condition({"column": "event_name", "op": "neq", "value": "screen_view"}) == "event_name <> 'screen_view'"
+
+
+def test_neq_escapes_trailing_backslash():
+    out = _compile_condition({"column": "event_name", "op": "neq", "value": "x\\"})
+    assert out == "event_name <> 'x\\\\'"
+
+
+def test_in_escapes_backslash_in_each_value():
+    out = _compile_condition({"column": "event_name", "op": "in", "value": "a\\, b"})
+    assert out == "event_name IN ('a\\\\', 'b')"
+
+
+def test_regex_doubles_backslash_for_string_literal_layer():
+    # a user regex \d+ must reach the engine as \d+, so the string literal carries \\d+
+    out = _compile_condition({"column": "screenName", "op": "regex", "value": "\\d+"})
+    assert out == "screenName RLIKE '\\\\d+'"
 
 
 def test_contains_wraps_wildcards():

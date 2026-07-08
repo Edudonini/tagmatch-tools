@@ -43,6 +43,17 @@ def _validate_column(column):
     return column
 
 
+def _quote(value):
+    """Escape a string for a Databricks SQL literal.
+
+    escape_sql_string only doubles single quotes; Databricks (Spark, default
+    escapedStringLiterals=false) also treats backslash as a string-literal
+    escape char, so a raw backslash must be doubled before quoting or a
+    trailing backslash would consume the closing quote and break out.
+    """
+    return escape_sql_string(value.replace("\\", "\\\\"))
+
+
 def _escape_like(value):
     """Escape LIKE wildcards so a literal % or _ in the value is not a wildcard.
 
@@ -76,17 +87,17 @@ def _compile_condition(cond):
         parts = [p.strip() for p in str(value).split(",") if p.strip()]
         if not parts:
             raise ValueError(f"Operator 'in' on '{column}' needs at least one value.")
-        escaped = ", ".join(escape_sql_string(p) for p in parts)
+        escaped = ", ".join(_quote(p) for p in parts)
         return f"{column} IN ({escaped})"
 
     sval = str(value)
     if op == "eq":
-        return f"{column} = {escape_sql_string(sval)}"
+        return f"{column} = {_quote(sval)}"
     if op == "neq":
-        return f"{column} <> {escape_sql_string(sval)}"
+        return f"{column} <> {_quote(sval)}"
     if op == "contains":
         return f"{column} LIKE {escape_sql_string('%' + _escape_like(sval) + '%')}"
     if op == "starts_with":
         return f"{column} LIKE {escape_sql_string(_escape_like(sval) + '%')}"
     # op == "regex"
-    return f"{column} RLIKE {escape_sql_string(sval)}"
+    return f"{column} RLIKE {_quote(sval)}"
