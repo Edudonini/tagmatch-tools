@@ -774,19 +774,6 @@ tbody tr:hover {
   gap: 12px;
 }
 
-.qb-custom-event {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.qb-filter-fields {
-  display: flex;
-  gap: 14px;
-  flex-wrap: wrap;
-  padding-left: 26px;
-}
-
 .qb-columns-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
@@ -1083,3 +1070,6 @@ tbody tr:hover {
 .qb-andor-btn { padding: 3px 12px; background: none; border: none; cursor: pointer; color: inherit; }
 .qb-andor-btn.on { background: rgba(91,140,255,0.2); color: #5b8cff; font-weight: 700; }
 .qb-limit-field { display: block; margin-top: 12px; max-width: 180px; }
+.qb-hint { font-size: 11px; opacity: 0.55; margin-top: 6px; }
+.qb-cond-err { font-size: 11px; color: var(--error); margin-left: 2px; }
+.qb-cond-val--invalid { border-color: var(--error); }

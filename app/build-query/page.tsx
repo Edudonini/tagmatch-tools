@@ -8,6 +8,7 @@ import {
   CustomOptions,
   INITIAL_CUSTOM_STATE,
   buildCustomPayload,
+  hasInvalidNumeric,
   type CustomOptionsState,
   type SpecEvent,
 } from "./CustomOptions";
@@ -167,7 +168,8 @@ export default function BuildQueryPage() {
   const generateDisabled =
     !events ||
     generating ||
-    (queryType === "funnel" && funnelDisabled);
+    (queryType === "funnel" && funnelDisabled) ||
+    (queryType === "custom" && hasInvalidNumeric(customOptions));
 
   return (
     <main className="shell">

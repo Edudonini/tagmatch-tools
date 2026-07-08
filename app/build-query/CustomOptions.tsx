@@ -63,6 +63,22 @@ function opTakesValue(op: string): boolean {
   return OPERATORS.find((o) => o.value === op)?.takesValue ?? true;
 }
 
+function opIsNumeric(op: string): boolean {
+  return OPERATORS.find((o) => o.value === op)?.numeric ?? false;
+}
+
+// Mirrors the server's numeric literal check exactly (api/_lib/custom_query.py).
+const NUMERIC_RE = /^-?\d+(\.\d+)?$/;
+
+function isInvalidNumericValue(op: string, value: string): boolean {
+  return opIsNumeric(op) && value.trim() !== "" && !NUMERIC_RE.test(value.trim());
+}
+
+export function hasInvalidNumeric(state: CustomOptionsState): boolean {
+  const all = [...state.conditions, ...state.scopeConditions];
+  return all.some((c) => isInvalidNumericValue(c.op, c.value));
+}
+
 function cleanConditions(conditions: Condition[]): Condition[] {
   // Drop rows with no column; value-less operators keep an empty value.
   return conditions.filter((c) => c.column);
@@ -128,12 +144,19 @@ function ConditionList({
             ))}
           </select>
           {opTakesValue(c.op) && (
-            <input
-              className="qb-cond-val review-field-input"
-              value={c.value}
-              placeholder={c.op === "in" ? "a, b, c" : "valor"}
-              onChange={(e) => update(i, { value: e.target.value })}
-            />
+            <>
+              <input
+                className={`qb-cond-val review-field-input${isInvalidNumericValue(c.op, c.value) ? " qb-cond-val--invalid" : ""}`}
+                value={c.value}
+                placeholder={c.op === "in" ? "a, b, c" : "valor"}
+                inputMode={opIsNumeric(c.op) ? "decimal" : undefined}
+                aria-invalid={isInvalidNumericValue(c.op, c.value) || undefined}
+                onChange={(e) => update(i, { value: e.target.value })}
+              />
+              {isInvalidNumericValue(c.op, c.value) && (
+                <span className="qb-cond-err">número inválido</span>
+              )}
+            </>
           )}
           <button type="button" className="qb-cond-x" onClick={() => remove(i)} aria-label="Remover condição">✕</button>
         </div>
