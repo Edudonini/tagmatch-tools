@@ -150,19 +150,12 @@ def test_funnel_query():
 # --- build_query: custom ---
 
 def test_build_query_custom_count_sessions():
-    result = build_query(
-        [],
-        "custom",
-        {
-            "start_date": "2026-01-01",
-            "end_date": "2026-01-31",
-            "custom": {
-                "output_mode": "count_sessions",
-                "match": "and",
-                "conditions": [{"column": "event_name", "op": "eq", "value": "interaction"}],
-            },
-        },
-    )
+    result = build_query([], "custom", {
+        "start_date": "2026-01-01", "end_date": "2026-01-31",
+        "custom": {"output_mode": "count_sessions",
+                   "filter": {"match": "and", "groups": [
+                       {"match": "and", "conditions": [{"column": "event_name", "op": "eq", "value": "interaction"}]}]}},
+    })
     assert result["ok"] is True
     assert "COUNT(DISTINCT ga_session_id) AS session_count" in result["query"]
     assert result["event_mapping"] == {}
@@ -170,44 +163,24 @@ def test_build_query_custom_count_sessions():
 
 
 def test_build_query_custom_extract_with_session_scope():
-    result = build_query(
-        [],
-        "custom",
-        {
-            "start_date": "2026-01-01",
-            "end_date": "2026-01-31",
-            "custom": {
-                "output_mode": "extract",
-                "match": "and",
-                "conditions": [{"column": "screenName", "op": "eq", "value": "/napp/fatura"}],
-                "session_scope": {
-                    "match": "and",
-                    "conditions": [{"column": "screenName", "op": "eq", "value": "/napp/home"}],
-                },
-                "output_columns": ["event_name", "screenName"],
-                "limit": 100,
-            },
-        },
-    )
+    result = build_query([], "custom", {
+        "start_date": "2026-01-01", "end_date": "2026-01-31",
+        "custom": {"output_mode": "extract",
+                   "filter": {"match": "and", "groups": [
+                       {"match": "and", "conditions": [{"column": "screenName", "op": "eq", "value": "/napp/fatura"}]}]},
+                   "session_scope": {"match": "and", "conditions": [{"column": "screenName", "op": "eq", "value": "/napp/home"}]},
+                   "output_columns": ["event_name", "screenName"], "limit": 100}})
     assert result["ok"] is True
     assert "ga_session_id IN (SELECT ga_session_id FROM" in result["query"]
     assert "LIMIT 100" in result["query"]
 
 
 def test_build_query_custom_rejects_unknown_column_as_400_not_500():
-    result = build_query(
-        [],
-        "custom",
-        {
-            "start_date": "2026-01-01",
-            "end_date": "2026-01-31",
-            "custom": {
-                "output_mode": "count_sessions",
-                "match": "and",
-                "conditions": [{"column": "evil; DROP TABLE x", "op": "eq", "value": "1"}],
-            },
-        },
-    )
+    result = build_query([], "custom", {
+        "start_date": "2026-01-01", "end_date": "2026-01-31",
+        "custom": {"output_mode": "count_sessions",
+                   "filter": {"match": "and", "groups": [
+                       {"match": "and", "conditions": [{"column": "evil; DROP TABLE x", "op": "eq", "value": "1"}]}]}}})
     assert result["ok"] is False
     assert "Unknown column" in result["error"]
 
@@ -226,7 +199,7 @@ def test_build_query_custom_uses_table_override():
             "start_date": "2026-01-01",
             "end_date": "2026-01-31",
             "table_name": "cat.sch.tbl",
-            "custom": {"output_mode": "count_events", "match": "and", "conditions": []},
+            "custom": {"output_mode": "count_events", "filter": {"match": "and", "groups": []}},
         },
     )
     assert result["ok"] is True

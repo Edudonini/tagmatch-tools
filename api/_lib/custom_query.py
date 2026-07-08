@@ -19,8 +19,12 @@ ALLOWED_COLUMNS = frozenset(DEFAULT_SCHEMA_CONFIG["column_mapping"].values()) | 
     "ga_session_id", "data", "event_timestamp", "previousScreenName",
 }
 
-OUTPUT_MODES = ("count_sessions", "count_events", "extract")
+OUTPUT_MODES = ("count_sessions", "count_events", "extract", "aggregate")
 MATCH_MODES = ("and", "or")
+AGG_FUNCS = ("sum", "avg", "min", "max", "count")
+_AGG_SQL = {"sum": "SUM", "avg": "AVG", "min": "MIN", "max": "MAX", "count": "COUNT"}
+# Curated numeric subset of the allow-list; sum/avg/min/max require one of these.
+NUMERIC_COLUMNS = frozenset({"value", "price", "quantity", "discount", "module_position", "indice", "posicao"})
 
 DEFAULT_EXTRACT_COLUMNS = ("data", "event_timestamp", "event_name", "screenName", "ga_session_id")
 DEFAULT_LIMIT = 1000
@@ -109,10 +113,14 @@ def _date_filter(start_date, end_date):
     return f"data >= '{start_date}'"
 
 
-def _compile_conditions(conditions, match):
-    """Compile a condition list into a single '(a AND b)' / '(a OR b)' clause, or '' if empty."""
+def _compile_group(group):
+    """Compile one group {match, conditions:[...]} into '(a AND b)' / '(a OR b)', or '' if empty."""
+    if not isinstance(group, dict):
+        raise ValueError("Each group must be an object.")
+    conditions = group.get("conditions", [])
     if not isinstance(conditions, list):
         raise ValueError("conditions must be a list.")
+    match = group.get("match", "and")
     if match not in MATCH_MODES:
         raise ValueError(f"Invalid match mode: '{match}'. Must be 'and' or 'or'.")
     compiled = [_compile_condition(c) for c in conditions]
@@ -120,6 +128,40 @@ def _compile_conditions(conditions, match):
         return ""
     joiner = " AND " if match == "and" else " OR "
     return "(" + joiner.join(compiled) + ")"
+
+
+def _compile_filter(filt):
+    """Compile {match, groups:[...]} into '((g1) OR (g2))', a single group verbatim, or '' if empty."""
+    if not isinstance(filt, dict):
+        raise ValueError("filter must be an object.")
+    groups = filt.get("groups", [])
+    if not isinstance(groups, list):
+        raise ValueError("filter.groups must be a list.")
+    match = filt.get("match", "and")
+    if match not in MATCH_MODES:
+        raise ValueError(f"Invalid match mode: '{match}'. Must be 'and' or 'or'.")
+    compiled = [g for g in (_compile_group(gr) for gr in groups) if g]
+    if not compiled:
+        return ""
+    if len(compiled) == 1:
+        return compiled[0]  # single group -> no extra wrap (byte-for-byte v1)
+    joiner = " AND " if match == "and" else " OR "
+    return "(" + joiner.join(compiled) + ")"
+
+
+def _validate_group_by(raw):
+    """Return a validated list of group-by columns (allow-listed), or [] if none."""
+    if raw is None:
+        return []
+    if not isinstance(raw, list):
+        raise ValueError("group_by must be a list.")
+    return [_validate_column(c) for c in raw]
+
+
+def _count_conditions(filt):
+    if not isinstance(filt, dict):
+        return 0
+    return sum(len(g.get("conditions", []) or []) for g in filt.get("groups", []) if isinstance(g, dict))
 
 
 def _clamp_limit(raw):
@@ -143,27 +185,30 @@ def build_custom_query(payload, start_date, end_date=None, schema_config=None):
         raise ValueError(f"Invalid output_mode: '{output_mode}'. Must be one of {OUTPUT_MODES}.")
 
     table = (schema_config or DEFAULT_SCHEMA_CONFIG)["table_name"]
-    match = payload.get("match", "and")
 
     where_parts = [_date_filter(start_date, end_date)]
-    main_clause = _compile_conditions(payload.get("conditions", []), match)
+    main_clause = _compile_filter(payload.get("filter") or {})
     if main_clause:
         where_parts.append(main_clause)
 
     scope = payload.get("session_scope")
+    scope_condition_count = 0
     if scope:
         if not isinstance(scope, dict):
             raise ValueError("session_scope must be an object.")
-        scope_clause = _compile_conditions(scope.get("conditions", []), scope.get("match", "and"))
+        scope_condition_count = len(scope.get("conditions", []) or [])
+        scope_clause = _compile_group(scope)
         if scope_clause:
             subq_where = f"{_date_filter(start_date, end_date)} AND {scope_clause}"
             where_parts.append(f"ga_session_id IN (SELECT ga_session_id FROM {table} WHERE {subq_where})")
 
     where = " AND ".join(where_parts)
-
-    group_by = payload.get("group_by")
-    if group_by is not None:
-        _validate_column(group_by)
+    group_by = _validate_group_by(payload.get("group_by"))
+    condition_count = _count_conditions(payload.get("filter") or {})
+    base_meta = {
+        "condition_count": condition_count,
+        "session_condition_count": scope_condition_count,
+    }
 
     if output_mode == "extract":
         raw_cols = payload.get("output_columns") or list(DEFAULT_EXTRACT_COLUMNS)
@@ -178,37 +223,51 @@ def build_custom_query(payload, start_date, end_date=None, schema_config=None):
             f"ORDER BY event_timestamp\n"
             f"LIMIT {limit}"
         )
-        metadata = {
-            "output_mode": output_mode,
-            "condition_count": len(payload.get("conditions", []) or []),
-            "session_condition_count": len((scope or {}).get("conditions", []) or []) if scope else 0,
-            "group_by": None,
-            "limit": limit,
-        }
-        return {"query": query, "metadata": metadata}
+        return {"query": query, "metadata": {**base_meta, "output_mode": output_mode, "group_by": [], "limit": limit}}
+
+    if output_mode == "aggregate":
+        agg_spec = payload.get("aggregate")
+        if not isinstance(agg_spec, dict):
+            raise ValueError("aggregate must be an object.")
+        func = agg_spec.get("func")
+        if func not in AGG_FUNCS:
+            raise ValueError(f"Invalid aggregate function: '{func}'. Must be one of {AGG_FUNCS}.")
+        column = agg_spec.get("column")
+        if func == "count":
+            agg_expr = "COUNT(*)" if not column else f"COUNT({_validate_column(column)})"
+        else:
+            if not isinstance(column, str) or column not in NUMERIC_COLUMNS:
+                raise ValueError(
+                    f"A função '{func}' precisa de uma coluna numérica {sorted(NUMERIC_COLUMNS)}, recebi '{column}'."
+                )
+            agg_expr = f"{_AGG_SQL[func]}({column})"
+        agg = f"{agg_expr} AS resultado"
+        if group_by:
+            cols = ", ".join(group_by)
+            query = (
+                f"SELECT {cols}, {agg}\n"
+                f"FROM {table}\n"
+                f"WHERE {where}\n"
+                f"GROUP BY {cols}\n"
+                f"ORDER BY resultado DESC"
+            )
+        else:
+            query = f"SELECT {agg}\nFROM {table}\nWHERE {where}"
+        return {"query": query, "metadata": {**base_meta, "output_mode": output_mode,
+                                             "func": func, "column": column, "group_by": group_by, "limit": None}}
 
     # count_sessions / count_events
     agg = "COUNT(DISTINCT ga_session_id) AS session_count" if output_mode == "count_sessions" else "COUNT(*) AS event_count"
     order_col = "session_count" if output_mode == "count_sessions" else "event_count"
     if group_by:
+        cols = ", ".join(group_by)
         query = (
-            f"SELECT {group_by} AS grupo, {agg}\n"
+            f"SELECT {cols}, {agg}\n"
             f"FROM {table}\n"
             f"WHERE {where}\n"
-            f"GROUP BY {group_by}\n"
+            f"GROUP BY {cols}\n"
             f"ORDER BY {order_col} DESC"
         )
     else:
-        query = (
-            f"SELECT {agg}\n"
-            f"FROM {table}\n"
-            f"WHERE {where}"
-        )
-    metadata = {
-        "output_mode": output_mode,
-        "condition_count": len(payload.get("conditions", []) or []),
-        "session_condition_count": len((scope or {}).get("conditions", []) or []) if scope else 0,
-        "group_by": group_by,
-        "limit": None,
-    }
-    return {"query": query, "metadata": metadata}
+        query = f"SELECT {agg}\nFROM {table}\nWHERE {where}"
+    return {"query": query, "metadata": {**base_meta, "output_mode": output_mode, "group_by": group_by, "limit": None}}

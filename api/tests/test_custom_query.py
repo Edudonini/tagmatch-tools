@@ -117,173 +117,230 @@ def test_condition_must_be_object():
         _compile_condition("event_name = 1")
 
 
-from api._lib.custom_query import build_custom_query
+from api._lib.custom_query import build_custom_query, _compile_group, _compile_filter
 
 TABLE = "ecare_silver.b2c_ga4.silver_ga4_novo_app"
+
+
+def _grp(conditions, match="and"):
+    return {"match": match, "conditions": conditions}
+
+
+def _filter(groups, match="and"):
+    return {"match": match, "groups": groups}
 
 
 def _q(payload, start="2026-01-01", end="2026-01-31"):
     return build_custom_query(payload, start, end_date=end)["query"]
 
 
-def test_count_sessions_no_group_by():
-    q = _q({
-        "output_mode": "count_sessions",
-        "match": "and",
-        "conditions": [{"column": "event_name", "op": "eq", "value": "interaction"}],
-    })
+# --- group / filter compilation ---
+
+def test_compile_group_joins_by_match():
+    out = _compile_group(_grp([
+        {"column": "event_name", "op": "eq", "value": "interaction"},
+        {"column": "component_copy", "op": "contains", "value": "Continuar"},
+    ], match="and"))
+    assert out == "(event_name = 'interaction' AND component_copy LIKE '%Continuar%')"
+
+
+def test_compile_group_empty_returns_blank():
+    assert _compile_group(_grp([])) == ""
+
+
+def test_compile_filter_single_group_no_extra_parens():
+    # a single group reproduces v1 output byte-for-byte (no outer wrap)
+    out = _compile_filter(_filter([_grp([{"column": "event_name", "op": "eq", "value": "interaction"}])]))
+    assert out == "(event_name = 'interaction')"
+
+
+def test_compile_filter_two_groups_joined_by_outer_match():
+    out = _compile_filter(_filter([
+        _grp([{"column": "event_name", "op": "eq", "value": "interaction"}], match="and"),
+        _grp([{"column": "screenName", "op": "eq", "value": "/napp/fatura"}], match="and"),
+    ], match="or"))
+    assert out == "((event_name = 'interaction') OR (screenName = '/napp/fatura'))"
+
+
+def test_compile_filter_drops_empty_group():
+    out = _compile_filter(_filter([
+        _grp([{"column": "event_name", "op": "eq", "value": "interaction"}]),
+        _grp([]),
+    ], match="or"))
+    assert out == "(event_name = 'interaction')"
+
+
+def test_compile_filter_all_empty_returns_blank():
+    assert _compile_filter(_filter([_grp([]), _grp([])])) == ""
+
+
+def test_group_match_validated():
+    with pytest.raises(ValueError, match="match"):
+        _compile_group(_grp([{"column": "event_name", "op": "eq", "value": "x"}], match="nand"))
+
+
+def test_group_column_validated():
+    with pytest.raises(ValueError, match="Unknown column"):
+        _compile_group(_grp([{"column": "evil", "op": "eq", "value": "x"}]))
+
+
+# --- build_custom_query: count modes with the new shape ---
+
+def test_count_sessions_single_group():
+    q = _q({"output_mode": "count_sessions",
+            "filter": _filter([_grp([{"column": "event_name", "op": "eq", "value": "interaction"}])])})
     assert "SELECT COUNT(DISTINCT ga_session_id) AS session_count" in q
     assert f"FROM {TABLE}" in q
-    assert "WHERE data BETWEEN '2026-01-01' AND '2026-01-31'" in q
-    assert "(event_name = 'interaction')" in q
+    assert "WHERE data BETWEEN '2026-01-01' AND '2026-01-31' AND (event_name = 'interaction')" in q
     assert "GROUP BY" not in q
 
 
-def test_count_events():
-    q = _q({
-        "output_mode": "count_events",
-        "match": "and",
-        "conditions": [{"column": "event_name", "op": "eq", "value": "interaction"}],
-    })
+def test_count_nested_groups():
+    q = _q({"output_mode": "count_events",
+            "filter": _filter([
+                _grp([{"column": "event_name", "op": "eq", "value": "interaction"},
+                      {"column": "component_copy", "op": "contains", "value": "Continuar"}], match="and"),
+                _grp([{"column": "screenName", "op": "eq", "value": "/napp/fatura"}], match="and"),
+            ], match="or")})
     assert "SELECT COUNT(*) AS event_count" in q
+    assert "((event_name = 'interaction' AND component_copy LIKE '%Continuar%') OR (screenName = '/napp/fatura'))" in q
 
 
-def test_conditions_joined_by_or():
-    q = _q({
-        "output_mode": "count_sessions",
-        "match": "or",
-        "conditions": [
-            {"column": "event_name", "op": "eq", "value": "interaction"},
-            {"column": "component_copy", "op": "contains", "value": "Continuar"},
-        ],
-    })
-    assert "(event_name = 'interaction' OR component_copy LIKE '%Continuar%')" in q
-
-
-def test_count_with_group_by():
-    q = _q({
-        "output_mode": "count_events",
-        "match": "and",
-        "conditions": [],
-        "group_by": "screenName",
-    })
-    assert "SELECT screenName AS grupo, COUNT(*) AS event_count" in q
-    assert "GROUP BY screenName" in q
-    assert "ORDER BY event_count DESC" in q
-
-
-def test_group_by_column_validated():
-    with pytest.raises(ValueError, match="Unknown column"):
-        _q({"output_mode": "count_sessions", "match": "and", "conditions": [], "group_by": "evil"})
-
-
-def test_no_conditions_counts_everything_in_range():
-    q = _q({"output_mode": "count_sessions", "match": "and", "conditions": []})
+def test_count_no_filter_counts_everything():
+    q = _q({"output_mode": "count_sessions", "filter": _filter([_grp([])])})
     assert "WHERE data BETWEEN '2026-01-01' AND '2026-01-31'" in q
-    assert " AND (" not in q  # no conditions clause appended
+    assert " AND (" not in q
 
 
-def test_date_filter_start_only():
-    q = build_custom_query(
-        {"output_mode": "count_sessions", "match": "and", "conditions": []},
-        "2026-01-01", end_date=None,
-    )["query"]
-    assert "WHERE data >= '2026-01-01'" in q
+def test_count_multi_dimension_group_by():
+    q = _q({"output_mode": "count_events",
+            "filter": _filter([_grp([])]),
+            "group_by": ["screenName", "event_name"]})
+    assert "SELECT screenName, event_name, COUNT(*) AS event_count" in q
+    assert "GROUP BY screenName, event_name" in q
+    assert "ORDER BY event_count DESC" in q
+    assert "AS grupo" not in q
 
 
-def test_extract_default_columns_and_limit():
-    q = _q({"output_mode": "extract", "match": "and", "conditions": [{"column": "screenName", "op": "eq", "value": "/napp/fatura"}]})
-    assert "SELECT data, event_timestamp, event_name, screenName, ga_session_id" in q
-    assert "ORDER BY event_timestamp" in q
-    assert "LIMIT 1000" in q
-
-
-def test_extract_custom_columns_and_limit():
-    q = build_custom_query({
-        "output_mode": "extract",
-        "match": "and",
-        "conditions": [],
-        "output_columns": ["event_name", "screenName"],
-        "limit": 50,
-    }, "2026-01-01", end_date="2026-01-31")["query"]
-    assert "SELECT event_name, screenName" in q
-    assert "LIMIT 50" in q
-
-
-def test_extract_output_column_validated():
+def test_group_by_entry_validated():
     with pytest.raises(ValueError, match="Unknown column"):
-        build_custom_query({
-            "output_mode": "extract", "match": "and", "conditions": [],
-            "output_columns": ["event_name", "evil"],
-        }, "2026-01-01", end_date="2026-01-31")
+        _q({"output_mode": "count_sessions", "filter": _filter([_grp([])]), "group_by": ["evil"]})
 
 
-def test_limit_clamped_to_max():
-    q = build_custom_query({
-        "output_mode": "extract", "match": "and", "conditions": [], "limit": 99999,
-    }, "2026-01-01", end_date="2026-01-31")["query"]
-    assert "LIMIT 10000" in q
+def test_group_by_must_be_list():
+    with pytest.raises(ValueError, match="group_by must be a list"):
+        _q({"output_mode": "count_sessions", "filter": _filter([_grp([])]), "group_by": "screenName"})
 
 
-def test_limit_floor_is_one():
-    q = build_custom_query({
-        "output_mode": "extract", "match": "and", "conditions": [], "limit": 0,
-    }, "2026-01-01", end_date="2026-01-31")["query"]
-    assert "LIMIT 1" in q
-
+# --- session scope (flat, unchanged shape) ---
 
 def test_session_scope_subquery():
-    q = _q({
-        "output_mode": "count_sessions",
-        "match": "and",
-        "conditions": [{"column": "event_name", "op": "eq", "value": "interaction"}],
-        "session_scope": {
-            "match": "and",
-            "conditions": [{"column": "screenName", "op": "eq", "value": "/napp/home"}],
-        },
-    })
+    q = _q({"output_mode": "count_sessions",
+            "filter": _filter([_grp([{"column": "event_name", "op": "eq", "value": "interaction"}])]),
+            "session_scope": {"match": "and", "conditions": [{"column": "screenName", "op": "eq", "value": "/napp/home"}]}})
     assert "ga_session_id IN (SELECT ga_session_id FROM" in q
     assert "(screenName = '/napp/home')" in q
 
 
 def test_session_scope_column_validated():
     with pytest.raises(ValueError, match="Unknown column"):
-        _q({
-            "output_mode": "count_sessions", "match": "and", "conditions": [],
-            "session_scope": {"match": "and", "conditions": [{"column": "evil", "op": "eq", "value": "x"}]},
-        })
+        _q({"output_mode": "count_sessions", "filter": _filter([_grp([])]),
+            "session_scope": {"match": "and", "conditions": [{"column": "evil", "op": "eq", "value": "x"}]}})
 
+
+# --- extract mode (shape unchanged except group_by removed) ---
+
+def test_extract_default_columns_and_limit():
+    q = _q({"output_mode": "extract",
+            "filter": _filter([_grp([{"column": "screenName", "op": "eq", "value": "/napp/fatura"}])])})
+    assert "SELECT data, event_timestamp, event_name, screenName, ga_session_id" in q
+    assert "ORDER BY event_timestamp" in q
+    assert "LIMIT 1000" in q
+
+
+def test_extract_limit_clamped():
+    q = build_custom_query({"output_mode": "extract", "filter": _filter([_grp([])]), "limit": 99999},
+                           "2026-01-01", end_date="2026-01-31")["query"]
+    assert "LIMIT 10000" in q
+
+
+# --- aggregate mode ---
+
+def test_aggregate_sum_grouped_two_dims():
+    q = _q({"output_mode": "aggregate",
+            "filter": _filter([_grp([{"column": "event_name", "op": "eq", "value": "purchase"}])]),
+            "aggregate": {"func": "sum", "column": "value"},
+            "group_by": ["screenName", "item_category"]})
+    assert "SELECT screenName, item_category, SUM(value) AS resultado" in q
+    assert "GROUP BY screenName, item_category" in q
+    assert "ORDER BY resultado DESC" in q
+
+
+def test_aggregate_grand_total_no_group_by():
+    q = _q({"output_mode": "aggregate", "filter": _filter([_grp([])]),
+            "aggregate": {"func": "avg", "column": "price"}})
+    assert "SELECT AVG(price) AS resultado" in q
+    assert "GROUP BY" not in q
+    assert "ORDER BY" not in q
+
+
+def test_aggregate_count_star_when_no_column():
+    q = _q({"output_mode": "aggregate", "filter": _filter([_grp([])]),
+            "aggregate": {"func": "count", "column": None}})
+    assert "SELECT COUNT(*) AS resultado" in q
+
+
+def test_aggregate_count_with_column():
+    q = _q({"output_mode": "aggregate", "filter": _filter([_grp([])]),
+            "aggregate": {"func": "count", "column": "item_id"}})
+    assert "SELECT COUNT(item_id) AS resultado" in q
+
+
+def test_aggregate_numeric_column_gate_rejects_non_numeric():
+    with pytest.raises(ValueError, match="numérica"):
+        _q({"output_mode": "aggregate", "filter": _filter([_grp([])]),
+            "aggregate": {"func": "sum", "column": "screenName"}})
+
+
+def test_aggregate_invalid_func_rejected():
+    with pytest.raises(ValueError, match="aggregate function"):
+        _q({"output_mode": "aggregate", "filter": _filter([_grp([])]),
+            "aggregate": {"func": "median", "column": "value"}})
+
+
+def test_aggregate_column_still_allow_listed_for_count():
+    with pytest.raises(ValueError, match="Unknown column"):
+        _q({"output_mode": "aggregate", "filter": _filter([_grp([])]),
+            "aggregate": {"func": "count", "column": "evil"}})
+
+
+# --- enums / shapes / metadata ---
 
 def test_invalid_output_mode_rejected():
     with pytest.raises(ValueError, match="output_mode"):
-        _q({"output_mode": "delete_everything", "match": "and", "conditions": []})
+        _q({"output_mode": "delete_everything", "filter": _filter([_grp([])])})
 
 
-def test_invalid_match_rejected():
-    with pytest.raises(ValueError, match="match"):
-        _q({"output_mode": "count_sessions", "match": "nand", "conditions": []})
-
-
-def test_conditions_must_be_list():
-    with pytest.raises(ValueError, match="conditions must be a list"):
-        _q({"output_mode": "count_sessions", "match": "and", "conditions": "nope"})
+def test_filter_groups_must_be_list():
+    with pytest.raises(ValueError, match="groups must be a list"):
+        _q({"output_mode": "count_sessions", "filter": {"match": "and", "groups": "nope"}})
 
 
 def test_metadata_reports_shape():
-    result = build_custom_query({
-        "output_mode": "count_sessions", "match": "and",
-        "conditions": [{"column": "event_name", "op": "eq", "value": "interaction"}],
-        "group_by": "screenName",
-    }, "2026-01-01", end_date="2026-01-31")
-    assert result["metadata"]["output_mode"] == "count_sessions"
+    result = build_custom_query({"output_mode": "aggregate",
+                                 "filter": _filter([_grp([{"column": "event_name", "op": "eq", "value": "purchase"}])]),
+                                 "aggregate": {"func": "sum", "column": "value"},
+                                 "group_by": ["screenName"]},
+                                "2026-01-01", end_date="2026-01-31")
+    assert result["metadata"]["output_mode"] == "aggregate"
+    assert result["metadata"]["func"] == "sum"
+    assert result["metadata"]["column"] == "value"
+    assert result["metadata"]["group_by"] == ["screenName"]
     assert result["metadata"]["condition_count"] == 1
-    assert result["metadata"]["group_by"] == "screenName"
 
 
 def test_custom_table_name_used():
-    q = build_custom_query(
-        {"output_mode": "count_sessions", "match": "and", "conditions": []},
-        "2026-01-01", end_date="2026-01-31",
-        schema_config={"table_name": "my_catalog.my_schema.my_table"},
-    )["query"]
-    assert "FROM my_catalog.my_schema.my_table" in q
+    q = build_custom_query({"output_mode": "count_sessions", "filter": _filter([_grp([])])},
+                           "2026-01-01", end_date="2026-01-31",
+                           schema_config={"table_name": "cat.sch.tbl"})["query"]
+    assert "FROM cat.sch.tbl" in q
