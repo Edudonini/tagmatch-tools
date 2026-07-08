@@ -115,3 +115,175 @@ def test_unknown_operator_rejected():
 def test_condition_must_be_object():
     with pytest.raises(ValueError, match="must be an object"):
         _compile_condition("event_name = 1")
+
+
+from api._lib.custom_query import build_custom_query
+
+TABLE = "ecare_silver.b2c_ga4.silver_ga4_novo_app"
+
+
+def _q(payload, start="2026-01-01", end="2026-01-31"):
+    return build_custom_query(payload, start, end_date=end)["query"]
+
+
+def test_count_sessions_no_group_by():
+    q = _q({
+        "output_mode": "count_sessions",
+        "match": "and",
+        "conditions": [{"column": "event_name", "op": "eq", "value": "interaction"}],
+    })
+    assert "SELECT COUNT(DISTINCT ga_session_id) AS session_count" in q
+    assert f"FROM {TABLE}" in q
+    assert "WHERE data BETWEEN '2026-01-01' AND '2026-01-31'" in q
+    assert "(event_name = 'interaction')" in q
+    assert "GROUP BY" not in q
+
+
+def test_count_events():
+    q = _q({
+        "output_mode": "count_events",
+        "match": "and",
+        "conditions": [{"column": "event_name", "op": "eq", "value": "interaction"}],
+    })
+    assert "SELECT COUNT(*) AS event_count" in q
+
+
+def test_conditions_joined_by_or():
+    q = _q({
+        "output_mode": "count_sessions",
+        "match": "or",
+        "conditions": [
+            {"column": "event_name", "op": "eq", "value": "interaction"},
+            {"column": "component_copy", "op": "contains", "value": "Continuar"},
+        ],
+    })
+    assert "(event_name = 'interaction' OR component_copy LIKE '%Continuar%')" in q
+
+
+def test_count_with_group_by():
+    q = _q({
+        "output_mode": "count_events",
+        "match": "and",
+        "conditions": [],
+        "group_by": "screenName",
+    })
+    assert "SELECT screenName AS grupo, COUNT(*) AS event_count" in q
+    assert "GROUP BY screenName" in q
+    assert "ORDER BY event_count DESC" in q
+
+
+def test_group_by_column_validated():
+    with pytest.raises(ValueError, match="Unknown column"):
+        _q({"output_mode": "count_sessions", "match": "and", "conditions": [], "group_by": "evil"})
+
+
+def test_no_conditions_counts_everything_in_range():
+    q = _q({"output_mode": "count_sessions", "match": "and", "conditions": []})
+    assert "WHERE data BETWEEN '2026-01-01' AND '2026-01-31'" in q
+    assert " AND (" not in q  # no conditions clause appended
+
+
+def test_date_filter_start_only():
+    q = build_custom_query(
+        {"output_mode": "count_sessions", "match": "and", "conditions": []},
+        "2026-01-01", end_date=None,
+    )["query"]
+    assert "WHERE data >= '2026-01-01'" in q
+
+
+def test_extract_default_columns_and_limit():
+    q = _q({"output_mode": "extract", "match": "and", "conditions": [{"column": "screenName", "op": "eq", "value": "/napp/fatura"}]})
+    assert "SELECT data, event_timestamp, event_name, screenName, ga_session_id" in q
+    assert "ORDER BY event_timestamp" in q
+    assert "LIMIT 1000" in q
+
+
+def test_extract_custom_columns_and_limit():
+    q = build_custom_query({
+        "output_mode": "extract",
+        "match": "and",
+        "conditions": [],
+        "output_columns": ["event_name", "screenName"],
+        "limit": 50,
+    }, "2026-01-01", end_date="2026-01-31")["query"]
+    assert "SELECT event_name, screenName" in q
+    assert "LIMIT 50" in q
+
+
+def test_extract_output_column_validated():
+    with pytest.raises(ValueError, match="Unknown column"):
+        build_custom_query({
+            "output_mode": "extract", "match": "and", "conditions": [],
+            "output_columns": ["event_name", "evil"],
+        }, "2026-01-01", end_date="2026-01-31")
+
+
+def test_limit_clamped_to_max():
+    q = build_custom_query({
+        "output_mode": "extract", "match": "and", "conditions": [], "limit": 99999,
+    }, "2026-01-01", end_date="2026-01-31")["query"]
+    assert "LIMIT 10000" in q
+
+
+def test_limit_floor_is_one():
+    q = build_custom_query({
+        "output_mode": "extract", "match": "and", "conditions": [], "limit": 0,
+    }, "2026-01-01", end_date="2026-01-31")["query"]
+    assert "LIMIT 1" in q
+
+
+def test_session_scope_subquery():
+    q = _q({
+        "output_mode": "count_sessions",
+        "match": "and",
+        "conditions": [{"column": "event_name", "op": "eq", "value": "interaction"}],
+        "session_scope": {
+            "match": "and",
+            "conditions": [{"column": "screenName", "op": "eq", "value": "/napp/home"}],
+        },
+    })
+    assert "ga_session_id IN (SELECT ga_session_id FROM" in q
+    assert "(screenName = '/napp/home')" in q
+
+
+def test_session_scope_column_validated():
+    with pytest.raises(ValueError, match="Unknown column"):
+        _q({
+            "output_mode": "count_sessions", "match": "and", "conditions": [],
+            "session_scope": {"match": "and", "conditions": [{"column": "evil", "op": "eq", "value": "x"}]},
+        })
+
+
+def test_invalid_output_mode_rejected():
+    with pytest.raises(ValueError, match="output_mode"):
+        _q({"output_mode": "delete_everything", "match": "and", "conditions": []})
+
+
+def test_invalid_match_rejected():
+    with pytest.raises(ValueError, match="match"):
+        _q({"output_mode": "count_sessions", "match": "nand", "conditions": []})
+
+
+def test_conditions_must_be_list():
+    with pytest.raises(ValueError, match="conditions must be a list"):
+        _q({"output_mode": "count_sessions", "match": "and", "conditions": "nope"})
+
+
+def test_metadata_reports_shape():
+    result = build_custom_query({
+        "output_mode": "count_sessions", "match": "and",
+        "conditions": [{"column": "event_name", "op": "eq", "value": "interaction"}],
+        "group_by": "screenName",
+    }, "2026-01-01", end_date="2026-01-31")
+    assert result["metadata"]["output_mode"] == "count_sessions"
+    assert result["metadata"]["condition_count"] == 1
+    assert result["metadata"]["group_by"] == "screenName"
+
+
+def test_custom_table_name_used():
+    q = build_custom_query(
+        {"output_mode": "count_sessions", "match": "and", "conditions": []},
+        "2026-01-01", end_date="2026-01-31",
+        schema_config={"table_name": "my_catalog.my_schema.my_table"},
+    )["query"]
+    assert "FROM my_catalog.my_schema.my_table" in q

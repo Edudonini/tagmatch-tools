@@ -101,3 +101,114 @@ def _compile_condition(cond):
         return f"{column} LIKE {escape_sql_string(_escape_like(sval) + '%')}"
     # op == "regex"
     return f"{column} RLIKE {_quote(sval)}"
+
+
+def _date_filter(start_date, end_date):
+    if end_date:
+        return f"data BETWEEN '{start_date}' AND '{end_date}'"
+    return f"data >= '{start_date}'"
+
+
+def _compile_conditions(conditions, match):
+    """Compile a condition list into a single '(a AND b)' / '(a OR b)' clause, or '' if empty."""
+    if not isinstance(conditions, list):
+        raise ValueError("conditions must be a list.")
+    if match not in MATCH_MODES:
+        raise ValueError(f"Invalid match mode: '{match}'. Must be 'and' or 'or'.")
+    compiled = [_compile_condition(c) for c in conditions]
+    if not compiled:
+        return ""
+    joiner = " AND " if match == "and" else " OR "
+    return "(" + joiner.join(compiled) + ")"
+
+
+def _clamp_limit(raw):
+    try:
+        n = int(raw)
+    except (TypeError, ValueError):
+        n = DEFAULT_LIMIT
+    return max(1, min(MAX_LIMIT, n))
+
+
+def build_custom_query(payload, start_date, end_date=None, schema_config=None):
+    """Build Databricks SQL from a structured custom-query payload.
+
+    Returns {"query": str, "metadata": dict}. Raises ValueError on invalid input.
+    """
+    if not isinstance(payload, dict):
+        raise ValueError("Custom query payload must be an object.")
+
+    output_mode = payload.get("output_mode")
+    if output_mode not in OUTPUT_MODES:
+        raise ValueError(f"Invalid output_mode: '{output_mode}'. Must be one of {OUTPUT_MODES}.")
+
+    table = (schema_config or DEFAULT_SCHEMA_CONFIG)["table_name"]
+    match = payload.get("match", "and")
+
+    where_parts = [_date_filter(start_date, end_date)]
+    main_clause = _compile_conditions(payload.get("conditions", []), match)
+    if main_clause:
+        where_parts.append(main_clause)
+
+    scope = payload.get("session_scope")
+    if scope:
+        if not isinstance(scope, dict):
+            raise ValueError("session_scope must be an object.")
+        scope_clause = _compile_conditions(scope.get("conditions", []), scope.get("match", "and"))
+        if scope_clause:
+            subq_where = f"{_date_filter(start_date, end_date)} AND {scope_clause}"
+            where_parts.append(f"ga_session_id IN (SELECT ga_session_id FROM {table} WHERE {subq_where})")
+
+    where = " AND ".join(where_parts)
+
+    group_by = payload.get("group_by")
+    if group_by is not None:
+        _validate_column(group_by)
+
+    if output_mode == "extract":
+        raw_cols = payload.get("output_columns") or list(DEFAULT_EXTRACT_COLUMNS)
+        if not isinstance(raw_cols, list):
+            raise ValueError("output_columns must be a list.")
+        columns = [_validate_column(c) for c in raw_cols] or list(DEFAULT_EXTRACT_COLUMNS)
+        limit = _clamp_limit(payload.get("limit", DEFAULT_LIMIT))
+        query = (
+            f"SELECT {', '.join(columns)}\n"
+            f"FROM {table}\n"
+            f"WHERE {where}\n"
+            f"ORDER BY event_timestamp\n"
+            f"LIMIT {limit}"
+        )
+        metadata = {
+            "output_mode": output_mode,
+            "condition_count": len(payload.get("conditions", []) or []),
+            "session_condition_count": len((scope or {}).get("conditions", []) or []) if scope else 0,
+            "group_by": None,
+            "limit": limit,
+        }
+        return {"query": query, "metadata": metadata}
+
+    # count_sessions / count_events
+    agg = "COUNT(DISTINCT ga_session_id) AS session_count" if output_mode == "count_sessions" else "COUNT(*) AS event_count"
+    order_col = "session_count" if output_mode == "count_sessions" else "event_count"
+    if group_by:
+        query = (
+            f"SELECT {group_by} AS grupo, {agg}\n"
+            f"FROM {table}\n"
+            f"WHERE {where}\n"
+            f"GROUP BY {group_by}\n"
+            f"ORDER BY {order_col} DESC"
+        )
+    else:
+        query = (
+            f"SELECT {agg}\n"
+            f"FROM {table}\n"
+            f"WHERE {where}"
+        )
+    metadata = {
+        "output_mode": output_mode,
+        "condition_count": len(payload.get("conditions", []) or []),
+        "session_condition_count": len((scope or {}).get("conditions", []) or []) if scope else 0,
+        "group_by": group_by,
+        "limit": None,
+    }
+    return {"query": query, "metadata": metadata}
