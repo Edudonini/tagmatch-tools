@@ -533,13 +533,6 @@ tbody tr:hover {
 
 /* Review mode */
 
-.review-entry-bar {
-  margin-top: 28px;
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-}
-
 .review-mode {
   margin-top: 28px;
   display: flex;

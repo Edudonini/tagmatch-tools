@@ -31,11 +31,13 @@ export default function MatchPage() {
   const [loading, setLoading] = useState(false);
   const [drawerRow, setDrawerRow] = useState<MatchRow | null>(null);
   const [fromHandoff, setFromHandoff] = useState(false);
+  const [handoffCount, setHandoffCount] = useState(0);
 
   useEffect(() => {
     const rows = takeSpecHandoff();
     if (rows && rows.length > 0) {
       setSpecFile(rowsToSpecFile(rows));
+      setHandoffCount(rows.length);
       setFromHandoff(true);
     }
   }, []);
@@ -104,7 +106,7 @@ export default function MatchPage() {
       </div>
 
       {fromHandoff && specFile && (
-        <p className="handoff-banner">Spec carregado da Extração de Mapa.</p>
+        <p className="handoff-banner">Spec carregado da Extração de Mapa · {handoffCount} eventos.</p>
       )}
 
       {result && !result.ok && <p className="alert-error">Couldn&apos;t run matching: {result.error}</p>}
