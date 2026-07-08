@@ -36,6 +36,7 @@ export default function BuildQueryPage() {
   const [parseError, setParseError] = useState<string | null>(null);
   const [parsing, setParsing] = useState(false);
   const [fromHandoff, setFromHandoff] = useState(false);
+  const [handoffLoading, setHandoffLoading] = useState(false);
 
   const [queryType, setQueryType] = useState<string>("validation");
   const [startDate, setStartDate] = useState(() => isoDaysAgo(7));
@@ -99,7 +100,10 @@ export default function BuildQueryPage() {
   useEffect(() => {
     const rows = takeSpecHandoff();
     if (rows && rows.length > 0) {
-      handleFileChange(rowsToSpecFile(rows)).then(() => setFromHandoff(true));
+      setHandoffLoading(true);
+      handleFileChange(rowsToSpecFile(rows))
+        .then(() => setFromHandoff(true))
+        .finally(() => setHandoffLoading(false));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -195,6 +199,13 @@ export default function BuildQueryPage() {
         <span className="file-name">{file ? file.name : "No file chosen"}</span>
         {parsing && <span className="qb-parsing">Parsing…</span>}
       </div>
+
+      {handoffLoading && (
+        <p className="handoff-loading">
+          <span className="handoff-spinner" aria-hidden="true" />
+          Carregando o mapa extraído…
+        </p>
+      )}
 
       {fromHandoff && events && (
         <p className="handoff-banner">Spec carregado da Extração de Mapa · {events.length} eventos.</p>

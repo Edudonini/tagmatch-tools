@@ -1032,3 +1032,35 @@ tbody tr:hover {
   font-size: 13px;
   font-family: var(--font-mono), ui-monospace, monospace;
 }
+
+.handoff-loading {
+  margin-top: 16px;
+  padding: 12px 16px;
+  border-radius: 8px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 13px;
+  font-family: var(--font-mono), ui-monospace, monospace;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.handoff-spinner {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  animation: handoff-spin 0.7s linear infinite;
+  flex: none;
+}
+
+@keyframes handoff-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .handoff-spinner { animation: none; }
+}
