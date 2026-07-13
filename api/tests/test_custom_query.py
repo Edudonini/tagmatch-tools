@@ -287,52 +287,153 @@ def test_extract_limit_clamped():
 
 # --- aggregate mode ---
 
-def test_aggregate_sum_grouped_two_dims():
-    q = _q({"output_mode": "aggregate",
-            "filter": _filter([_grp([{"column": "event_name", "op": "eq", "value": "purchase"}])]),
-            "aggregate": {"func": "sum", "column": "value"},
-            "group_by": ["screenName", "item_category"]})
-    assert "SELECT screenName, item_category, SUM(value) AS resultado" in q
-    assert "GROUP BY screenName, item_category" in q
-    assert "ORDER BY resultado DESC" in q
+def _metric(func, column=None):
+    return {"func": func, "column": column}
 
 
-def test_aggregate_grand_total_no_group_by():
-    q = _q({"output_mode": "aggregate", "filter": _filter([_grp([])]),
-            "aggregate": {"func": "avg", "column": "price"}})
-    assert "SELECT AVG(price) AS resultado" in q
+def _aggq(metrics, group_by=None, having=None, time_bucket=None, filt=None):
+    payload = {"output_mode": "aggregate", "aggregate": {"metrics": metrics}}
+    if having is not None:
+        payload["aggregate"]["having"] = having
+    if group_by is not None:
+        payload["group_by"] = group_by
+    if time_bucket is not None:
+        payload["time_bucket"] = time_bucket
+    if filt is not None:
+        payload["filter"] = filt
+    return payload
+
+
+def test_aggregate_single_metric_auto_alias():
+    q = _q(_aggq([_metric("sum", "value")]))
+    assert "SELECT SUM(value) AS sum_value" in q
+    assert f"FROM {TABLE}" in q
     assert "GROUP BY" not in q
     assert "ORDER BY" not in q
 
 
-def test_aggregate_count_star_when_no_column():
-    q = _q({"output_mode": "aggregate", "filter": _filter([_grp([])]),
-            "aggregate": {"func": "count", "column": None}})
-    assert "SELECT COUNT(*) AS resultado" in q
+def test_aggregate_count_star_alias_total():
+    q = _q(_aggq([_metric("count")]))
+    assert "SELECT COUNT(*) AS total" in q
 
 
-def test_aggregate_count_with_column():
-    q = _q({"output_mode": "aggregate", "filter": _filter([_grp([])]),
-            "aggregate": {"func": "count", "column": "item_id"}})
-    assert "SELECT COUNT(item_id) AS resultado" in q
+def test_aggregate_count_with_column_alias():
+    q = _q(_aggq([_metric("count", "item_id")]))
+    assert "SELECT COUNT(item_id) AS count_item_id" in q
 
 
-def test_aggregate_numeric_column_gate_rejects_non_numeric():
+def test_aggregate_multiple_metrics_distinct_aliases():
+    q = _q(_aggq([_metric("sum", "value"), _metric("count"), _metric("avg", "price")]))
+    assert "SELECT SUM(value) AS sum_value, COUNT(*) AS total, AVG(price) AS avg_price" in q
+
+
+def test_aggregate_duplicate_metric_deduped_alias():
+    q = _q(_aggq([_metric("sum", "value"), _metric("sum", "value")]))
+    assert "SUM(value) AS sum_value, SUM(value) AS sum_value_2" in q
+
+
+def test_aggregate_approx_count_distinct():
+    q = _q(_aggq([_metric("approx_count_distinct", "ga_session_id")]))
+    assert "APPROX_COUNT_DISTINCT(ga_session_id) AS approx_distinct_ga_session_id" in q
+
+
+def test_aggregate_stddev_numeric_gate():
     with pytest.raises(ValueError, match="numérica"):
-        _q({"output_mode": "aggregate", "filter": _filter([_grp([])]),
-            "aggregate": {"func": "sum", "column": "screenName"}})
+        _q(_aggq([_metric("stddev", "screenName")]))
+
+
+def test_aggregate_approx_requires_column():
+    with pytest.raises(ValueError, match="approx_count_distinct"):
+        _q(_aggq([_metric("approx_count_distinct")]))
+
+
+def test_aggregate_empty_metrics_rejected():
+    with pytest.raises(ValueError, match="métrica"):
+        _q(_aggq([]))
 
 
 def test_aggregate_invalid_func_rejected():
-    with pytest.raises(ValueError, match="aggregate function"):
-        _q({"output_mode": "aggregate", "filter": _filter([_grp([])]),
-            "aggregate": {"func": "median", "column": "value"}})
+    with pytest.raises(ValueError, match="Invalid aggregate function"):
+        _q(_aggq([_metric("median", "value")]))
 
 
-def test_aggregate_column_still_allow_listed_for_count():
+def test_aggregate_metric_column_validated():
     with pytest.raises(ValueError, match="Unknown column"):
-        _q({"output_mode": "aggregate", "filter": _filter([_grp([])]),
-            "aggregate": {"func": "count", "column": "evil"}})
+        _q(_aggq([_metric("sum", "evil; DROP TABLE x")]))
+
+
+def test_aggregate_grouped_orders_by_first_metric():
+    q = _q(_aggq([_metric("sum", "value"), _metric("count")], group_by=["screenName", "item_category"]))
+    assert "SELECT screenName, item_category, SUM(value) AS sum_value, COUNT(*) AS total" in q
+    assert "GROUP BY screenName, item_category" in q
+    assert "ORDER BY sum_value DESC" in q
+
+
+def test_aggregate_having_single():
+    q = _q(_aggq([_metric("count")], group_by=["screenName"],
+                 having=[{"func": "count", "column": None, "op": "gt", "value": "100"}]))
+    assert "HAVING COUNT(*) > 100" in q
+
+
+def test_aggregate_having_multiple_and():
+    q = _q(_aggq([_metric("sum", "value")], group_by=["screenName"],
+                 having=[{"func": "sum", "column": "value", "op": "gte", "value": "1000"},
+                         {"func": "count", "column": None, "op": "lt", "value": "50"}]))
+    assert "HAVING SUM(value) >= 1000 AND COUNT(*) < 50" in q
+
+
+def test_aggregate_having_value_must_be_numeric():
+    with pytest.raises(ValueError, match="num"):
+        _q(_aggq([_metric("count")], having=[{"func": "count", "column": None, "op": "gt", "value": "abc"}]))
+
+
+def test_aggregate_having_op_validated():
+    with pytest.raises(ValueError, match="HAVING"):
+        _q(_aggq([_metric("count")], having=[{"func": "count", "column": None, "op": "like", "value": "1"}]))
+
+
+def test_aggregate_having_column_validated():
+    with pytest.raises(ValueError, match="Unknown column"):
+        _q(_aggq([_metric("count")], having=[{"func": "sum", "column": "evil", "op": "gt", "value": "1"}]))
+
+
+def test_aggregate_time_bucket_week():
+    q = _q(_aggq([_metric("count")], time_bucket={"unit": "week"}))
+    assert "SELECT trunc(CAST(data AS DATE), 'WEEK') AS periodo, COUNT(*) AS total" in q
+    assert "GROUP BY trunc(CAST(data AS DATE), 'WEEK')" in q
+    assert "ORDER BY periodo ASC" in q
+
+
+def test_aggregate_time_bucket_day_and_month():
+    qd = _q(_aggq([_metric("count")], time_bucket={"unit": "day"}))
+    assert "CAST(data AS DATE) AS periodo" in qd
+    qm = _q(_aggq([_metric("count")], time_bucket={"unit": "month"}))
+    assert "trunc(CAST(data AS DATE), 'MM') AS periodo" in qm
+
+
+def test_aggregate_time_bucket_with_dims():
+    q = _q(_aggq([_metric("count")], group_by=["screenName"], time_bucket={"unit": "day"}))
+    assert "SELECT CAST(data AS DATE) AS periodo, screenName, COUNT(*) AS total" in q
+    assert "GROUP BY CAST(data AS DATE), screenName" in q
+    assert "ORDER BY periodo ASC" in q
+
+
+def test_aggregate_time_bucket_unit_validated():
+    with pytest.raises(ValueError, match="time_bucket"):
+        _q(_aggq([_metric("count")], time_bucket={"unit": "fortnight"}))
+
+
+def test_aggregate_metadata():
+    res = build_custom_query(
+        _aggq([_metric("sum", "value"), _metric("count")], group_by=["screenName"],
+              time_bucket={"unit": "week"},
+              having=[{"func": "count", "column": None, "op": "gt", "value": "10"}]),
+        "2026-01-01", end_date="2026-01-31")
+    assert res["metadata"]["output_mode"] == "aggregate"
+    assert res["metadata"]["metric_count"] == 2
+    assert res["metadata"]["group_by"] == ["screenName"]
+    assert res["metadata"]["has_time_bucket"] is True
+    assert res["metadata"]["having_count"] == 1
 
 
 # --- enums / shapes / metadata ---
@@ -345,19 +446,6 @@ def test_invalid_output_mode_rejected():
 def test_filter_groups_must_be_list():
     with pytest.raises(ValueError, match="groups must be a list"):
         _q({"output_mode": "count_sessions", "filter": {"match": "and", "groups": "nope"}})
-
-
-def test_metadata_reports_shape():
-    result = build_custom_query({"output_mode": "aggregate",
-                                 "filter": _filter([_grp([{"column": "event_name", "op": "eq", "value": "purchase"}])]),
-                                 "aggregate": {"func": "sum", "column": "value"},
-                                 "group_by": ["screenName"]},
-                                "2026-01-01", end_date="2026-01-31")
-    assert result["metadata"]["output_mode"] == "aggregate"
-    assert result["metadata"]["func"] == "sum"
-    assert result["metadata"]["column"] == "value"
-    assert result["metadata"]["group_by"] == ["screenName"]
-    assert result["metadata"]["condition_count"] == 1
 
 
 def test_custom_table_name_used():

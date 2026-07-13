@@ -231,6 +231,27 @@ def test_build_query_custom_funnel_one_step_is_400_not_500():
     assert "2 etapas" in result["error"]
 
 
+def test_build_query_custom_aggregate_metrics_ok():
+    result = build_query([], "custom", {
+        "start_date": "2026-01-01", "end_date": "2026-01-31",
+        "custom": {"output_mode": "aggregate",
+                   "aggregate": {"metrics": [{"func": "sum", "column": "value"}, {"func": "count", "column": None}]},
+                   "group_by": ["screenName"]},
+    })
+    assert result["ok"] is True
+    assert "SUM(value) AS sum_value, COUNT(*) AS total" in result["query"]
+    assert result["metadata"]["metric_count"] == 2
+
+
+def test_build_query_custom_aggregate_empty_metrics_is_400_not_500():
+    result = build_query([], "custom", {
+        "start_date": "2026-01-01", "end_date": "2026-01-31",
+        "custom": {"output_mode": "aggregate", "aggregate": {"metrics": []}},
+    })
+    assert result["ok"] is False
+    assert "métrica" in result["error"]
+
+
 # --- table override + validation ---
 
 def test_table_name_override():
