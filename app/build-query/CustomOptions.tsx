@@ -108,6 +108,40 @@ function cleanConditions(conditions: Condition[]): { column: string; op: string;
   return conditions.filter((c) => c.column).map(({ column, op, value }) => ({ column, op, value }));
 }
 
+// Maps the spec's short field names to their Silver columns for suggestions.
+const SPEC_FIELD_TO_COLUMN: Record<string, string> = {
+  sn: "screenName",
+  name: "event_name",
+  ct: "eventCategory",
+  ac: "eventAction",
+  lb: "eventLabel",
+};
+
+// Build column -> distinct spec values (advisory autocomplete only; the server
+// still validates/escapes every value). Empty for columns with no spec values.
+function buildSuggestionIndex(events: SpecEvent[]): Record<string, string[]> {
+  const allowed = new Set(ALL_COLUMNS);
+  const acc: Record<string, Set<string>> = {};
+  const add = (col: string, raw: unknown) => {
+    const v = String(raw ?? "").trim();
+    if (!v) return;
+    (acc[col] ??= new Set()).add(v);
+  };
+  for (const ev of events) {
+    for (const [key, col] of Object.entries(SPEC_FIELD_TO_COLUMN)) {
+      if (key in ev) add(col, (ev as Record<string, unknown>)[key]);
+    }
+    for (const [key, val] of Object.entries(ev)) {
+      if (allowed.has(key)) add(key, val);
+    }
+  }
+  const out: Record<string, string[]> = {};
+  for (const [col, set] of Object.entries(acc)) {
+    out[col] = Array.from(set).sort().slice(0, 50);
+  }
+  return out;
+}
+
 export function buildCustomPayload(state: CustomOptionsState): Record<string, unknown> {
   const groups = state.groups
     .map((g) => ({ match: g.match, conditions: cleanConditions(g.conditions) }))
@@ -146,8 +180,9 @@ function ColumnOptions() {
   );
 }
 
-function ConditionRow({ cond, onChange, onRemove }: { cond: Condition; onChange: (patch: Partial<Condition>) => void; onRemove: () => void }) {
+function ConditionRow({ cond, suggestions, onChange, onRemove }: { cond: Condition; suggestions?: string[]; onChange: (patch: Partial<Condition>) => void; onRemove: () => void }) {
   const numErr = numericError(cond.op, cond.value);
+  const listId = suggestions && suggestions.length > 0 ? `dl-${cond.id}` : undefined;
   return (
     <div className="qb-cond-row">
       <select className="qb-cond-col" value={cond.column} onChange={(e) => onChange({ column: e.target.value })}>
@@ -166,8 +201,14 @@ function ConditionRow({ cond, onChange, onRemove }: { cond: Condition; onChange:
             placeholder={cond.op === "in" ? "a, b, c" : "valor"}
             inputMode={opIsNumeric(cond.op) ? "decimal" : undefined}
             aria-invalid={numErr ? true : undefined}
+            list={listId}
             onChange={(e) => onChange({ value: e.target.value })}
           />
+          {listId && (
+            <datalist id={listId}>
+              {suggestions!.map((s) => <option key={s} value={s} />)}
+            </datalist>
+          )}
           {numErr && <span className="qb-cond-err">{numErr}</span>}
         </>
       )}
@@ -247,6 +288,8 @@ export function CustomOptions({ events, value, onChange }: CustomOptionsProps) {
     { key: "sum", label: "SUM" }, { key: "avg", label: "AVG" }, { key: "min", label: "MIN" }, { key: "max", label: "MAX" }, { key: "count", label: "COUNT" },
   ];
 
+  const suggestionIndex = buildSuggestionIndex(events);
+
   return (
     <div className="qb-custom">
       {/* Block 1: output mode */}
@@ -279,7 +322,7 @@ export function CustomOptions({ events, value, onChange }: CustomOptionsProps) {
                 )}
               </div>
               {g.conditions.map((c, ci) => (
-                <ConditionRow key={c.id} cond={c} onChange={(patch) => updateCondition(gi, ci, patch)} onRemove={() => removeCondition(gi, ci)} />
+                <ConditionRow key={c.id} cond={c} suggestions={suggestionIndex[c.column]} onChange={(patch) => updateCondition(gi, ci, patch)} onRemove={() => removeCondition(gi, ci)} />
               ))}
               <div className="qb-cb-actions">
                 <button type="button" className="qb-add" onClick={() => addCondition(gi)}>+ Adicionar condição</button>
@@ -305,7 +348,7 @@ export function CustomOptions({ events, value, onChange }: CustomOptionsProps) {
         {value.scopeEnabled && (
           <>
             {value.scopeConditions.map((c, ci) => (
-              <ConditionRow key={c.id} cond={c} onChange={(patch) => updateScope(ci, patch)} onRemove={() => removeScope(ci)} />
+              <ConditionRow key={c.id} cond={c} suggestions={suggestionIndex[c.column]} onChange={(patch) => updateScope(ci, patch)} onRemove={() => removeScope(ci)} />
             ))}
             <button type="button" className="qb-add" onClick={addScopeCondition}>+ Adicionar condição de sessão</button>
             <p className="qb-hint">Considera sessões cujo algum evento satisfaz isto (subquery sobre ga_session_id).</p>
