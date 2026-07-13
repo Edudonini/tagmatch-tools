@@ -181,6 +181,16 @@ export function buildCustomPayload(state: CustomOptionsState): Record<string, un
     payload.aggregate = { func: state.aggFunc, column: state.aggColumn || null };
     payload.group_by = state.groupByDims;
   } else if (state.outputMode === "funnel") {
+    // The global filter is optional in funnel mode: drop conditions that need a
+    // value but have none (and groups left empty) so an untouched filter emits
+    // nothing, instead of a base-scan-zeroing `event_name = ''`.
+    const globalGroups = state.groups
+      .map((g) => ({
+        match: g.match,
+        conditions: cleanConditions(g.conditions).filter((c) => !opTakesValue(c.op) || c.value.trim() !== ""),
+      }))
+      .filter((g) => g.conditions.length > 0);
+    payload.filter = { match: state.match, groups: globalGroups };
     payload.funnel = {
       steps: state.funnelSteps.map((s) => {
         const step: Record<string, unknown> = { match: s.match, conditions: cleanConditions(s.conditions) };

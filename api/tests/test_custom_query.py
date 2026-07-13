@@ -469,6 +469,16 @@ def test_funnel_custom_label_escaped():
     assert "'O''Brien'" in q  # single quote doubled, no literal breakout
 
 
+def test_funnel_label_backslash_escaped():
+    # the label is the one free-text funnel string; a trailing backslash must be
+    # doubled (via _quote) so it cannot escape the closing quote in Databricks
+    q = _q(_funnel([
+        _fstep([{"column": "event_name", "op": "eq", "value": "a"}], label="path\\"),
+        _fstep([{"column": "event_name", "op": "eq", "value": "b"}]),
+    ]))
+    assert "'path\\\\' AS etapa" in q
+
+
 def test_funnel_global_filter_applied_to_base():
     q = _q(_funnel([
         _fstep([{"column": "event_name", "op": "eq", "value": "a"}]),
