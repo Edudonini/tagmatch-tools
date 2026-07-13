@@ -530,3 +530,25 @@ def test_funnel_metadata_flags_global_filter():
     ], filt=_filter([_grp([{"column": "audience", "op": "eq", "value": "premium"}])])),
         "2026-01-01", end_date="2026-01-31")
     assert res["metadata"]["has_global_filter"] is True
+
+
+def test_funnel_accepts_exactly_max_steps():
+    # FUNNEL_MAX_STEPS (10) is the accepting boundary: 10 steps must succeed
+    steps = [_fstep([{"column": "event_name", "op": "eq", "value": str(i)}]) for i in range(10)]
+    q = _q(_funnel(steps))
+    assert "(SELECT COUNT(*) FROM t10 WHERE ts10 IS NOT NULL) AS c10" in q
+    assert q.count("UNION ALL") == 9
+
+
+def test_funnel_rejects_non_dict_funnel_spec():
+    with pytest.raises(ValueError, match="funnel deve ser um objeto"):
+        build_custom_query({"output_mode": "funnel", "funnel": "nope"},
+                           "2026-01-01", end_date="2026-01-31")
+
+
+def test_funnel_rejects_non_dict_step():
+    with pytest.raises(ValueError, match="Cada etapa deve ser um objeto"):
+        _q(_funnel([
+            _fstep([{"column": "event_name", "op": "eq", "value": "a"}]),
+            "not-a-dict",
+        ]))
