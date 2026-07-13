@@ -1073,3 +1073,10 @@ tbody tr:hover {
 .qb-hint { font-size: 11px; opacity: 0.55; margin-top: 6px; }
 .qb-cond-err { font-size: 11px; color: var(--error); margin-left: 2px; }
 .qb-cond-val--invalid { border-color: var(--error); }
+
+/* Custom query builder v2 — groups + aggregate */
+.qb-group { border: 1px solid rgba(128,128,128,0.25); border-radius: 8px; padding: 10px 12px; margin-top: 8px; }
+.qb-group-join { display: flex; justify-content: center; margin: 8px 0 2px; }
+.qb-add-group { margin-top: 10px; font-weight: 600; }
+.qb-agg-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.qb-agg-of { font-size: 12.5px; opacity: 0.6; }
