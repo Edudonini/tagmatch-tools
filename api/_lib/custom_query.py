@@ -309,13 +309,16 @@ def _agg_expr(func, column):
             raise ValueError("A função 'approx_count_distinct' precisa de uma coluna.")
         return f"APPROX_COUNT_DISTINCT({_validate_column(column)})"
     # sum / avg / min / max / stddev -> numeric column required
-    if isinstance(column, str) and column:
-        _validate_column(column)  # allow-list first, so an unknown/injected column is rejected as such
-    if not isinstance(column, str) or column not in NUMERIC_COLUMNS:
-        raise ValueError(
-            f"A função '{func}' precisa de uma coluna numérica {sorted(NUMERIC_COLUMNS)}, recebi '{column}'."
-        )
-    return f"{_AGG_SQL[func]}({column})"
+    if func in _NUMERIC_AGG_FUNCS:
+        # allow-list first, so an unknown/injected column is rejected as such
+        col = _validate_column(column) if isinstance(column, str) and column else None
+        if col is None or col not in NUMERIC_COLUMNS:
+            raise ValueError(
+                f"A função '{func}' precisa de uma coluna numérica {sorted(NUMERIC_COLUMNS)}, recebi '{column}'."
+            )
+        return f"{_AGG_SQL[func]}({col})"
+    # count and approx_count_distinct are handled above; no other func is possible
+    raise ValueError(f"Invalid aggregate function: '{func}'.")
 
 
 def _agg_alias(func, column):
