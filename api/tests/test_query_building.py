@@ -206,6 +206,31 @@ def test_build_query_custom_uses_table_override():
     assert "FROM cat.sch.tbl" in result["query"]
 
 
+def test_build_query_custom_funnel_ok():
+    result = build_query([], "custom", {
+        "start_date": "2026-01-01", "end_date": "2026-01-31",
+        "custom": {"output_mode": "funnel", "funnel": {"steps": [
+            {"match": "and", "conditions": [{"column": "event_name", "op": "eq", "value": "screen_view"}]},
+            {"match": "and", "conditions": [{"column": "event_name", "op": "eq", "value": "interaction"}]},
+        ]}},
+    })
+    assert result["ok"] is True
+    assert result["query"].startswith("WITH base AS (")
+    assert result["metadata"]["output_mode"] == "funnel"
+    assert result["metadata"]["step_count"] == 2
+
+
+def test_build_query_custom_funnel_one_step_is_400_not_500():
+    result = build_query([], "custom", {
+        "start_date": "2026-01-01", "end_date": "2026-01-31",
+        "custom": {"output_mode": "funnel", "funnel": {"steps": [
+            {"match": "and", "conditions": [{"column": "event_name", "op": "eq", "value": "screen_view"}]},
+        ]}},
+    })
+    assert result["ok"] is False
+    assert "2 etapas" in result["error"]
+
+
 # --- table override + validation ---
 
 def test_table_name_override():

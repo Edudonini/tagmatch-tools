@@ -1080,3 +1080,28 @@ tbody tr:hover {
 .qb-add-group { margin-top: 10px; font-weight: 600; }
 .qb-agg-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .qb-agg-of { font-size: 12.5px; opacity: 0.6; }
+
+/* Custom query builder v3 — ordered funnel step editor */
+.qb-funnel-step-card {
+  border: 1px solid var(--border, rgba(128,128,128,0.25));
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 10px;
+}
+.qb-funnel-step-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.qb-funnel-step-head input {
+  flex: 1;
+}
+.qb-funnel-step-btn {
+  padding: 2px 8px;
+  line-height: 1.4;
+}
+.qb-funnel-step-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}

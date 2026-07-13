@@ -6,9 +6,10 @@ export type SpecEvent = Record<string, unknown>;
 
 export type Condition = { id: string; column: string; op: string; value: string };
 export type ConditionGroup = { id: string; match: "and" | "or"; conditions: Condition[] };
+export type FunnelStep = { id: string; label: string; match: "and" | "or"; conditions: Condition[] };
 
 export type CustomOptionsState = {
-  outputMode: "count_sessions" | "count_events" | "extract" | "aggregate";
+  outputMode: "count_sessions" | "count_events" | "extract" | "aggregate" | "funnel";
   match: "and" | "or"; // between groups
   groups: ConditionGroup[];
   scopeEnabled: boolean;
@@ -19,6 +20,7 @@ export type CustomOptionsState = {
   limit: number;
   aggFunc: "sum" | "avg" | "min" | "max" | "count";
   aggColumn: string; // "" = none
+  funnelSteps: FunnelStep[];
 };
 
 let idSeq = 0;
@@ -31,6 +33,9 @@ function newCondition(column = "event_name", op = "eq", value = ""): Condition {
 }
 function newGroup(): ConditionGroup {
   return { id: newId(), match: "and", conditions: [newCondition()] };
+}
+function newFunnelStep(): FunnelStep {
+  return { id: newId(), label: "", match: "and", conditions: [newCondition()] };
 }
 
 export const OPERATORS: { value: string; label: string; takesValue: boolean; numeric?: boolean }[] = [
@@ -79,6 +84,7 @@ export const INITIAL_CUSTOM_STATE: CustomOptionsState = {
   limit: 1000,
   aggFunc: "sum",
   aggColumn: "",
+  funnelSteps: [newFunnelStep(), newFunnelStep()],
 };
 
 function opTakesValue(op: string): boolean {
@@ -99,10 +105,19 @@ function numericError(op: string, value: string): string | null {
 }
 
 export function hasInvalidNumeric(state: CustomOptionsState): boolean {
-  const all = [...state.groups.flatMap((g) => g.conditions), ...state.scopeConditions];
+  const all = [
+    ...state.groups.flatMap((g) => g.conditions),
+    ...state.scopeConditions,
+    ...state.funnelSteps.flatMap((s) => s.conditions),
+  ];
   if (all.some((c) => numericError(c.op, c.value) !== null)) return true;
   // Aggregate mode: sum/avg/min/max require a column; count may omit it.
   if (state.outputMode === "aggregate" && state.aggFunc !== "count" && !state.aggColumn) return true;
+  // Funnel mode: need at least 2 steps that each carry a real condition.
+  if (state.outputMode === "funnel") {
+    const usable = state.funnelSteps.filter((s) => s.conditions.some((c) => c.column));
+    if (usable.length < 2) return true;
+  }
   return false;
 }
 
@@ -165,6 +180,24 @@ export function buildCustomPayload(state: CustomOptionsState): Record<string, un
   } else if (state.outputMode === "aggregate") {
     payload.aggregate = { func: state.aggFunc, column: state.aggColumn || null };
     payload.group_by = state.groupByDims;
+  } else if (state.outputMode === "funnel") {
+    // The global filter is optional in funnel mode: drop conditions that need a
+    // value but have none (and groups left empty) so an untouched filter emits
+    // nothing, instead of a base-scan-zeroing `event_name = ''`.
+    const globalGroups = state.groups
+      .map((g) => ({
+        match: g.match,
+        conditions: cleanConditions(g.conditions).filter((c) => !opTakesValue(c.op) || c.value.trim() !== ""),
+      }))
+      .filter((g) => g.conditions.length > 0);
+    payload.filter = { match: state.match, groups: globalGroups };
+    payload.funnel = {
+      steps: state.funnelSteps.map((s) => {
+        const step: Record<string, unknown> = { match: s.match, conditions: cleanConditions(s.conditions) };
+        if (s.label.trim()) step.label = s.label.trim();
+        return step;
+      }),
+    };
   } else {
     payload.group_by = state.groupByDims;
   }
@@ -282,12 +315,48 @@ export function CustomOptions({ events, value, onChange }: CustomOptionsProps) {
     const next = value.groupByDims.includes(col) ? value.groupByDims.filter((c) => c !== col) : [...value.groupByDims, col];
     onChange({ ...value, groupByDims: next });
   }
+  function updateFunnelStep(id: string, patch: Partial<FunnelStep>) {
+    onChange({ ...value, funnelSteps: value.funnelSteps.map((s) => (s.id === id ? { ...s, ...patch } : s)) });
+  }
+  function addFunnelStep() {
+    if (value.funnelSteps.length >= 10) return;
+    onChange({ ...value, funnelSteps: [...value.funnelSteps, newFunnelStep()] });
+  }
+  function removeFunnelStep(id: string) {
+    if (value.funnelSteps.length <= 2) return;
+    onChange({ ...value, funnelSteps: value.funnelSteps.filter((s) => s.id !== id) });
+  }
+  function moveFunnelStep(index: number, delta: number) {
+    const target = index + delta;
+    if (target < 0 || target >= value.funnelSteps.length) return;
+    const next = value.funnelSteps.slice();
+    [next[index], next[target]] = [next[target], next[index]];
+    onChange({ ...value, funnelSteps: next });
+  }
+  function addStepCondition(stepId: string) {
+    const step = value.funnelSteps.find((s) => s.id === stepId);
+    if (!step) return;
+    updateFunnelStep(stepId, { conditions: [...step.conditions, newCondition()] });
+  }
+  function removeStepCondition(stepId: string, condId: string) {
+    const step = value.funnelSteps.find((s) => s.id === stepId);
+    if (!step || step.conditions.length <= 1) return;
+    updateFunnelStep(stepId, { conditions: step.conditions.filter((c) => c.id !== condId) });
+  }
+  function updateStepCondition(stepId: string, condId: string, patch: Partial<Condition>) {
+    const step = value.funnelSteps.find((s) => s.id === stepId);
+    if (!step) return;
+    updateFunnelStep(stepId, {
+      conditions: step.conditions.map((c) => (c.id === condId ? { ...c, ...patch } : c)),
+    });
+  }
 
   const MODES: { key: CustomOptionsState["outputMode"]; label: string }[] = [
     { key: "count_sessions", label: "Contar sessões" },
     { key: "count_events", label: "Contar eventos" },
     { key: "extract", label: "Extrair linhas" },
     { key: "aggregate", label: "Agregar" },
+    { key: "funnel", label: "Funil" },
   ];
   const AGG_FUNCS: { key: CustomOptionsState["aggFunc"]; label: string }[] = [
     { key: "sum", label: "SUM" }, { key: "avg", label: "AVG" }, { key: "min", label: "MIN" }, { key: "max", label: "MAX" }, { key: "count", label: "COUNT" },
@@ -309,9 +378,40 @@ export function CustomOptions({ events, value, onChange }: CustomOptionsProps) {
         </div>
       </div>
 
+      {/* Block 1b: funnel steps (funnel mode only) */}
+      {value.outputMode === "funnel" && (
+        <div className="qb-cb-block">
+          <div className="qb-section-label">ETAPAS DO FUNIL</div>
+          {value.funnelSteps.map((s, si) => (
+            <div key={s.id} className="qb-funnel-step-card">
+              <div className="qb-funnel-step-head">
+                <span className="mono">{si + 1}.</span>
+                <input
+                  className="review-field-input"
+                  value={s.label}
+                  placeholder="Rótulo (opcional)"
+                  onChange={(e) => updateFunnelStep(s.id, { label: e.target.value })}
+                />
+                <button type="button" className="qb-funnel-step-btn" onClick={() => moveFunnelStep(si, -1)} disabled={si === 0} aria-label="Mover etapa para cima">↑</button>
+                <button type="button" className="qb-funnel-step-btn" onClick={() => moveFunnelStep(si, 1)} disabled={si === value.funnelSteps.length - 1} aria-label="Mover etapa para baixo">↓</button>
+                <button type="button" className="qb-funnel-step-btn" onClick={() => removeFunnelStep(s.id)} disabled={value.funnelSteps.length <= 2} aria-label="Remover etapa">Remover ✕</button>
+              </div>
+              <AndOrToggle value={s.match} onChange={(m) => updateFunnelStep(s.id, { match: m })} />
+              {s.conditions.map((c) => (
+                <ConditionRow key={c.id} cond={c} suggestions={suggestionIndex[c.column]} onChange={(patch) => updateStepCondition(s.id, c.id, patch)} onRemove={() => removeStepCondition(s.id, c.id)} />
+              ))}
+              <div className="qb-cb-actions">
+                <button type="button" className="qb-add" onClick={() => addStepCondition(s.id)}>+ Adicionar condição</button>
+              </div>
+            </div>
+          ))}
+          <button type="button" className="qb-add qb-add-group" onClick={addFunnelStep} disabled={value.funnelSteps.length >= 10}>+ Adicionar etapa</button>
+        </div>
+      )}
+
       {/* Block 2: condition groups */}
       <div className="qb-cb-block">
-        <div className="qb-section-label">Condições (eventos que batem)</div>
+        <div className="qb-section-label">{value.outputMode === "funnel" ? "FILTRO GLOBAL (OPCIONAL)" : "Condições (eventos que batem)"}</div>
         {value.groups.map((g, gi) => (
           <div key={g.id}>
             {gi > 0 && (
@@ -342,24 +442,26 @@ export function CustomOptions({ events, value, onChange }: CustomOptionsProps) {
       </div>
 
       {/* Block 3: session scope */}
-      <div className="qb-cb-block">
-        <div className="qb-cb-head">
-          <label className="qb-check">
-            <input type="checkbox" checked={value.scopeEnabled} onChange={(e) => onChange({ ...value, scopeEnabled: e.target.checked })} />
-            Limitar a sessões que passaram por…
-          </label>
-          {value.scopeEnabled && <AndOrToggle value={value.scopeMatch} onChange={(m) => onChange({ ...value, scopeMatch: m })} />}
+      {value.outputMode !== "funnel" && (
+        <div className="qb-cb-block">
+          <div className="qb-cb-head">
+            <label className="qb-check">
+              <input type="checkbox" checked={value.scopeEnabled} onChange={(e) => onChange({ ...value, scopeEnabled: e.target.checked })} />
+              Limitar a sessões que passaram por…
+            </label>
+            {value.scopeEnabled && <AndOrToggle value={value.scopeMatch} onChange={(m) => onChange({ ...value, scopeMatch: m })} />}
+          </div>
+          {value.scopeEnabled && (
+            <>
+              {value.scopeConditions.map((c, ci) => (
+                <ConditionRow key={c.id} cond={c} suggestions={suggestionIndex[c.column]} onChange={(patch) => updateScope(ci, patch)} onRemove={() => removeScope(ci)} />
+              ))}
+              <button type="button" className="qb-add" onClick={addScopeCondition}>+ Adicionar condição de sessão</button>
+              <p className="qb-hint">Considera sessões cujo algum evento satisfaz isto (subquery sobre ga_session_id).</p>
+            </>
+          )}
         </div>
-        {value.scopeEnabled && (
-          <>
-            {value.scopeConditions.map((c, ci) => (
-              <ConditionRow key={c.id} cond={c} suggestions={suggestionIndex[c.column]} onChange={(patch) => updateScope(ci, patch)} onRemove={() => removeScope(ci)} />
-            ))}
-            <button type="button" className="qb-add" onClick={addScopeCondition}>+ Adicionar condição de sessão</button>
-            <p className="qb-hint">Considera sessões cujo algum evento satisfaz isto (subquery sobre ga_session_id).</p>
-          </>
-        )}
-      </div>
+      )}
 
       {/* Block 4: mode-dependent */}
       {value.outputMode === "extract" && (
@@ -403,7 +505,7 @@ export function CustomOptions({ events, value, onChange }: CustomOptionsProps) {
         </div>
       )}
 
-      {(value.outputMode === "count_sessions" || value.outputMode === "count_events" || value.outputMode === "aggregate") && (
+      {value.outputMode !== "funnel" && (value.outputMode === "count_sessions" || value.outputMode === "count_events" || value.outputMode === "aggregate") && (
         <div className="qb-cb-block">
           <div className="qb-section-label">Agrupar por (opcional)</div>
           <div className="qb-columns-grid">

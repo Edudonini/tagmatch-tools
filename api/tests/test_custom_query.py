@@ -407,3 +407,158 @@ def test_date_filter_start_only():
     q = build_custom_query({"output_mode": "count_sessions", "filter": _filter([_grp([])])},
                            "2026-01-01", end_date=None)["query"]
     assert "WHERE data >= '2026-01-01'" in q
+
+
+# --- funnel mode (ordered multi-event session funnel) ---
+
+def _fstep(conditions, match="and", label=None):
+    step = {"match": match, "conditions": conditions}
+    if label is not None:
+        step["label"] = label
+    return step
+
+
+def _funnel(steps, filt=None):
+    payload = {"output_mode": "funnel", "funnel": {"steps": steps}}
+    if filt is not None:
+        payload["filter"] = filt
+    return payload
+
+
+def test_funnel_two_steps_structure():
+    q = _q(_funnel([
+        _fstep([{"column": "event_name", "op": "eq", "value": "screen_view"}]),
+        _fstep([{"column": "event_name", "op": "eq", "value": "interaction"}]),
+    ]))
+    assert q.startswith("WITH base AS (")
+    assert "CASE WHEN (event_name = 'screen_view') THEN 1 ELSE 0 END AS s1" in q
+    assert "CASE WHEN (event_name = 'interaction') THEN 1 ELSE 0 END AS s2" in q
+    assert f"FROM {TABLE}" in q
+    assert "WHERE data BETWEEN '2026-01-01' AND '2026-01-31'" in q
+    assert "MIN(CASE WHEN s1 = 1 THEN event_timestamp END) AS ts1" in q
+    assert "MIN(CASE WHEN b.s2 = 1 AND b.event_timestamp > p.ts1 THEN b.event_timestamp END) AS ts2" in q
+    assert "FROM base b JOIN t1 p ON b.ga_session_id = p.ga_session_id" in q
+    assert "WHERE p.ts1 IS NOT NULL" in q
+    assert "(SELECT COUNT(*) FROM t1 WHERE ts1 IS NOT NULL) AS c1" in q
+    assert "(SELECT COUNT(*) FROM t2 WHERE ts2 IS NOT NULL) AS c2" in q
+    assert "SELECT 1 AS ordem, 'Etapa 1' AS etapa, c1 AS sessoes, 100.0 AS pct_etapa1, CAST(NULL AS DOUBLE) AS pct_anterior FROM counts" in q
+    assert "SELECT 2, 'Etapa 2', c2, ROUND(100.0 * c2 / NULLIF(c1, 0), 1), ROUND(100.0 * c2 / NULLIF(c1, 0), 1) FROM counts" in q
+    assert q.rstrip().endswith("ORDER BY ordem")
+    assert q.count("UNION ALL") == 1
+
+
+def test_funnel_three_steps_ordering_and_pct():
+    q = _q(_funnel([
+        _fstep([{"column": "event_name", "op": "eq", "value": "a"}]),
+        _fstep([{"column": "event_name", "op": "eq", "value": "b"}]),
+        _fstep([{"column": "event_name", "op": "eq", "value": "c"}]),
+    ]))
+    assert "MIN(CASE WHEN b.s3 = 1 AND b.event_timestamp > p.ts2 THEN b.event_timestamp END) AS ts3" in q
+    assert "FROM base b JOIN t2 p ON b.ga_session_id = p.ga_session_id" in q
+    assert "(SELECT COUNT(*) FROM t3 WHERE ts3 IS NOT NULL) AS c3" in q
+    assert "SELECT 3, 'Etapa 3', c3, ROUND(100.0 * c3 / NULLIF(c1, 0), 1), ROUND(100.0 * c3 / NULLIF(c2, 0), 1) FROM counts" in q
+    assert q.count("UNION ALL") == 2
+
+
+def test_funnel_custom_label_escaped():
+    q = _q(_funnel([
+        _fstep([{"column": "event_name", "op": "eq", "value": "a"}], label="Viu a fatura"),
+        _fstep([{"column": "event_name", "op": "eq", "value": "b"}], label="O'Brien"),
+    ]))
+    assert "'Viu a fatura' AS etapa" in q
+    assert "'O''Brien'" in q  # single quote doubled, no literal breakout
+
+
+def test_funnel_label_backslash_escaped():
+    # the label is the one free-text funnel string; a trailing backslash must be
+    # doubled (via _quote) so it cannot escape the closing quote in Databricks
+    q = _q(_funnel([
+        _fstep([{"column": "event_name", "op": "eq", "value": "a"}], label="path\\"),
+        _fstep([{"column": "event_name", "op": "eq", "value": "b"}]),
+    ]))
+    assert "'path\\\\' AS etapa" in q
+
+
+def test_funnel_global_filter_applied_to_base():
+    q = _q(_funnel([
+        _fstep([{"column": "event_name", "op": "eq", "value": "a"}]),
+        _fstep([{"column": "event_name", "op": "eq", "value": "b"}]),
+    ], filt=_filter([_grp([{"column": "audience", "op": "eq", "value": "premium"}])])))
+    assert "WHERE data BETWEEN '2026-01-01' AND '2026-01-31' AND (audience = 'premium')" in q
+
+
+def test_funnel_requires_at_least_two_steps():
+    with pytest.raises(ValueError, match="2 etapas"):
+        _q(_funnel([_fstep([{"column": "event_name", "op": "eq", "value": "a"}])]))
+
+
+def test_funnel_rejects_more_than_max_steps():
+    steps = [_fstep([{"column": "event_name", "op": "eq", "value": str(i)}]) for i in range(11)]
+    with pytest.raises(ValueError, match="máximo"):
+        _q(_funnel(steps))
+
+
+def test_funnel_rejects_empty_step():
+    with pytest.raises(ValueError, match="ao menos uma condição"):
+        _q(_funnel([
+            _fstep([{"column": "event_name", "op": "eq", "value": "a"}]),
+            _fstep([]),
+        ]))
+
+
+def test_funnel_step_column_validated():
+    with pytest.raises(ValueError, match="Unknown column"):
+        _q(_funnel([
+            _fstep([{"column": "evil; DROP TABLE x", "op": "eq", "value": "a"}]),
+            _fstep([{"column": "event_name", "op": "eq", "value": "b"}]),
+        ]))
+
+
+def test_funnel_rejects_non_string_label():
+    with pytest.raises(ValueError, match="rótulo"):
+        _q(_funnel([
+            _fstep([{"column": "event_name", "op": "eq", "value": "a"}], label=123),
+            _fstep([{"column": "event_name", "op": "eq", "value": "b"}]),
+        ]))
+
+
+def test_funnel_metadata():
+    res = build_custom_query(_funnel([
+        _fstep([{"column": "event_name", "op": "eq", "value": "a"}]),
+        _fstep([{"column": "event_name", "op": "eq", "value": "b"},
+                {"column": "screenName", "op": "eq", "value": "/x"}]),
+    ]), "2026-01-01", end_date="2026-01-31")
+    assert res["metadata"] == {
+        "output_mode": "funnel", "step_count": 2, "condition_count": 3, "has_global_filter": False,
+    }
+
+
+def test_funnel_metadata_flags_global_filter():
+    res = build_custom_query(_funnel([
+        _fstep([{"column": "event_name", "op": "eq", "value": "a"}]),
+        _fstep([{"column": "event_name", "op": "eq", "value": "b"}]),
+    ], filt=_filter([_grp([{"column": "audience", "op": "eq", "value": "premium"}])])),
+        "2026-01-01", end_date="2026-01-31")
+    assert res["metadata"]["has_global_filter"] is True
+
+
+def test_funnel_accepts_exactly_max_steps():
+    # FUNNEL_MAX_STEPS (10) is the accepting boundary: 10 steps must succeed
+    steps = [_fstep([{"column": "event_name", "op": "eq", "value": str(i)}]) for i in range(10)]
+    q = _q(_funnel(steps))
+    assert "(SELECT COUNT(*) FROM t10 WHERE ts10 IS NOT NULL) AS c10" in q
+    assert q.count("UNION ALL") == 9
+
+
+def test_funnel_rejects_non_dict_funnel_spec():
+    with pytest.raises(ValueError, match="funnel deve ser um objeto"):
+        build_custom_query({"output_mode": "funnel", "funnel": "nope"},
+                           "2026-01-01", end_date="2026-01-31")
+
+
+def test_funnel_rejects_non_dict_step():
+    with pytest.raises(ValueError, match="Cada etapa deve ser um objeto"):
+        _q(_funnel([
+            _fstep([{"column": "event_name", "op": "eq", "value": "a"}]),
+            "not-a-dict",
+        ]))
