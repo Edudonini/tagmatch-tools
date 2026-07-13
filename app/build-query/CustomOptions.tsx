@@ -98,7 +98,10 @@ function numericError(op: string, value: string): string | null {
 
 export function hasInvalidNumeric(state: CustomOptionsState): boolean {
   const all = [...state.groups.flatMap((g) => g.conditions), ...state.scopeConditions];
-  return all.some((c) => numericError(c.op, c.value) !== null);
+  if (all.some((c) => numericError(c.op, c.value) !== null)) return true;
+  // Aggregate mode: sum/avg/min/max require a column; count may omit it.
+  if (state.outputMode === "aggregate" && state.aggFunc !== "count" && !state.aggColumn) return true;
+  return false;
 }
 
 function cleanConditions(conditions: Condition[]): { column: string; op: string; value: string }[] {
