@@ -162,6 +162,14 @@ def test_compile_filter_two_groups_joined_by_outer_match():
     assert out == "((event_name = 'interaction') OR (screenName = '/napp/fatura'))"
 
 
+def test_compile_filter_two_groups_joined_by_outer_and():
+    out = _compile_filter(_filter([
+        _grp([{"column": "event_name", "op": "eq", "value": "interaction"}], match="and"),
+        _grp([{"column": "screenName", "op": "eq", "value": "/napp/fatura"}], match="and"),
+    ], match="and"))
+    assert out == "((event_name = 'interaction') AND (screenName = '/napp/fatura'))"
+
+
 def test_compile_filter_drops_empty_group():
     out = _compile_filter(_filter([
         _grp([{"column": "event_name", "op": "eq", "value": "interaction"}]),
@@ -238,6 +246,19 @@ def test_session_scope_subquery():
     q = _q({"output_mode": "count_sessions",
             "filter": _filter([_grp([{"column": "event_name", "op": "eq", "value": "interaction"}])]),
             "session_scope": {"match": "and", "conditions": [{"column": "screenName", "op": "eq", "value": "/napp/home"}]}})
+    assert "ga_session_id IN (SELECT ga_session_id FROM" in q
+    assert "(screenName = '/napp/home')" in q
+
+
+def test_nested_filter_combined_with_session_scope():
+    # a multi-group (nested) main filter composes orthogonally with a flat session scope
+    q = _q({"output_mode": "count_sessions",
+            "filter": _filter([
+                _grp([{"column": "event_name", "op": "eq", "value": "interaction"}]),
+                _grp([{"column": "screenName", "op": "eq", "value": "/napp/fatura"}]),
+            ], match="or"),
+            "session_scope": {"match": "and", "conditions": [{"column": "screenName", "op": "eq", "value": "/napp/home"}]}})
+    assert "AND ((event_name = 'interaction') OR (screenName = '/napp/fatura'))" in q
     assert "ga_session_id IN (SELECT ga_session_id FROM" in q
     assert "(screenName = '/napp/home')" in q
 
