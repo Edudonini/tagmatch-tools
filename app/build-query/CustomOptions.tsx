@@ -7,6 +7,8 @@ export type SpecEvent = Record<string, unknown>;
 export type Condition = { id: string; column: string; op: string; value: string };
 export type ConditionGroup = { id: string; match: "and" | "or"; conditions: Condition[] };
 export type FunnelStep = { id: string; label: string; match: "and" | "or"; conditions: Condition[] };
+export type AggMetric = { id: string; func: string; column: string };
+export type HavingCond = { id: string; func: string; column: string; op: string; value: string };
 
 export type CustomOptionsState = {
   outputMode: "count_sessions" | "count_events" | "extract" | "aggregate" | "funnel";
@@ -18,8 +20,10 @@ export type CustomOptionsState = {
   groupByDims: string[];
   outputColumns: string[];
   limit: number;
-  aggFunc: "sum" | "avg" | "min" | "max" | "count";
-  aggColumn: string; // "" = none
+  metrics: AggMetric[];
+  having: HavingCond[];
+  timeBucketEnabled: boolean;
+  timeBucketUnit: "day" | "week" | "month";
   funnelSteps: FunnelStep[];
 };
 
@@ -36,6 +40,12 @@ function newGroup(): ConditionGroup {
 }
 function newFunnelStep(): FunnelStep {
   return { id: newId(), label: "", match: "and", conditions: [newCondition()] };
+}
+function newMetric(): AggMetric {
+  return { id: newId(), func: "count", column: "" };
+}
+function newHaving(): HavingCond {
+  return { id: newId(), func: "count", column: "", op: "gt", value: "" };
 }
 
 export const OPERATORS: { value: string; label: string; takesValue: boolean; numeric?: boolean }[] = [
@@ -70,6 +80,25 @@ export const ALL_COLUMNS: string[] = COLUMN_GROUPS.flatMap((g) => g.columns);
 // Mirrors NUMERIC_COLUMNS in api/_lib/custom_query.py — sum/avg/min/max need one of these.
 export const NUMERIC_COLUMNS = ["value", "price", "quantity", "discount", "module_position", "indice", "posicao"];
 
+export const AGG_FUNCTIONS: { value: string; label: string }[] = [
+  { value: "count", label: "COUNT" },
+  { value: "sum", label: "SUM" },
+  { value: "avg", label: "AVG" },
+  { value: "min", label: "MIN" },
+  { value: "max", label: "MAX" },
+  { value: "approx_count_distinct", label: "DISTINCT (aprox.)" },
+  { value: "stddev", label: "STDDEV" },
+];
+// Functions that require a numeric column (mirrors _NUMERIC_AGG_FUNCS in custom_query.py).
+const NUMERIC_AGG_FUNCS = new Set(["sum", "avg", "min", "max", "stddev"]);
+const HAVING_OPS: { value: string; label: string }[] = [
+  { value: "gt", label: ">" }, { value: "lt", label: "<" }, { value: "gte", label: "≥" },
+  { value: "lte", label: "≤" }, { value: "eq", label: "=" }, { value: "neq", label: "≠" },
+];
+const TIME_BUCKET_UNITS: { value: string; label: string }[] = [
+  { value: "day", label: "dia" }, { value: "week", label: "semana" }, { value: "month", label: "mês" },
+];
+
 const DEFAULT_EXTRACT_COLUMNS = ["data", "event_timestamp", "event_name", "screenName", "ga_session_id"];
 
 export const INITIAL_CUSTOM_STATE: CustomOptionsState = {
@@ -82,8 +111,10 @@ export const INITIAL_CUSTOM_STATE: CustomOptionsState = {
   groupByDims: [],
   outputColumns: [...DEFAULT_EXTRACT_COLUMNS],
   limit: 1000,
-  aggFunc: "sum",
-  aggColumn: "",
+  metrics: [newMetric()],
+  having: [],
+  timeBucketEnabled: false,
+  timeBucketUnit: "day",
   funnelSteps: [newFunnelStep(), newFunnelStep()],
 };
 
@@ -111,8 +142,24 @@ export function hasInvalidNumeric(state: CustomOptionsState): boolean {
     ...state.funnelSteps.flatMap((s) => s.conditions),
   ];
   if (all.some((c) => numericError(c.op, c.value) !== null)) return true;
-  // Aggregate mode: sum/avg/min/max require a column; count may omit it.
-  if (state.outputMode === "aggregate" && state.aggFunc !== "count" && !state.aggColumn) return true;
+  if (state.outputMode === "aggregate") {
+    // Every numeric-requiring metric needs a numeric column; approx_count_distinct needs a column.
+    const metricInvalid = state.metrics.some(
+      (m) =>
+        (NUMERIC_AGG_FUNCS.has(m.func) && !NUMERIC_COLUMNS.includes(m.column)) ||
+        (m.func === "approx_count_distinct" && !m.column)
+    );
+    if (state.metrics.length === 0 || metricInvalid) return true;
+    // Every filled HAVING row needs a numeric value and (for numeric funcs) a numeric column.
+    const havingInvalid = state.having.some(
+      (h) =>
+        h.value.trim() !== "" &&
+        (numericError("gt", h.value) !== null ||
+          (NUMERIC_AGG_FUNCS.has(h.func) && !NUMERIC_COLUMNS.includes(h.column)) ||
+          (h.func === "approx_count_distinct" && !h.column))
+    );
+    if (havingInvalid) return true;
+  }
   // Funnel mode: need at least 2 steps that each carry a real condition.
   if (state.outputMode === "funnel") {
     const usable = state.funnelSteps.filter((s) => s.conditions.some((c) => c.column));
@@ -178,8 +225,18 @@ export function buildCustomPayload(state: CustomOptionsState): Record<string, un
     payload.output_columns = state.outputColumns;
     payload.limit = state.limit;
   } else if (state.outputMode === "aggregate") {
-    payload.aggregate = { func: state.aggFunc, column: state.aggColumn || null };
+    const aggregate: Record<string, unknown> = {
+      metrics: state.metrics.map((m) => ({ func: m.func, column: m.column || null })),
+    };
+    const having = state.having
+      // Every HAVING row needs a numeric value; drop rows the user started but
+      // left blank so an unfinished row does not 400 (the server rejects "").
+      .filter((h) => h.value.trim() !== "")
+      .map((h) => ({ func: h.func, column: h.column || null, op: h.op, value: h.value }));
+    if (having.length > 0) aggregate.having = having;
+    payload.aggregate = aggregate;
     payload.group_by = state.groupByDims;
+    if (state.timeBucketEnabled) payload.time_bucket = { unit: state.timeBucketUnit };
   } else if (state.outputMode === "funnel") {
     // The global filter is optional in funnel mode: drop conditions that need a
     // value but have none (and groups left empty) so an untouched filter emits
@@ -214,6 +271,21 @@ function ColumnOptions() {
           ))}
         </optgroup>
       ))}
+    </>
+  );
+}
+
+// Column options for an aggregate func/metric: numeric-only for funcs that require a
+// numeric column, otherwise the full column list plus a leading empty option (only
+// meaningful for COUNT, which accepts "no column" = COUNT *).
+function AggColumnOptions({ func }: { func: string }) {
+  if (NUMERIC_AGG_FUNCS.has(func)) {
+    return <>{NUMERIC_COLUMNS.map((c) => <option key={c} value={c}>{c}</option>)}</>;
+  }
+  return (
+    <>
+      <option value="">— nenhuma —</option>
+      <ColumnOptions />
     </>
   );
 }
@@ -350,6 +422,25 @@ export function CustomOptions({ events, value, onChange }: CustomOptionsProps) {
       conditions: step.conditions.map((c) => (c.id === condId ? { ...c, ...patch } : c)),
     });
   }
+  function updateMetric(id: string, patch: Partial<AggMetric>) {
+    onChange({ ...value, metrics: value.metrics.map((m) => (m.id === id ? { ...m, ...patch } : m)) });
+  }
+  function addMetric() {
+    onChange({ ...value, metrics: [...value.metrics, newMetric()] });
+  }
+  function removeMetric(id: string) {
+    if (value.metrics.length <= 1) return;
+    onChange({ ...value, metrics: value.metrics.filter((m) => m.id !== id) });
+  }
+  function updateHaving(id: string, patch: Partial<HavingCond>) {
+    onChange({ ...value, having: value.having.map((h) => (h.id === id ? { ...h, ...patch } : h)) });
+  }
+  function addHaving() {
+    onChange({ ...value, having: [...value.having, newHaving()] });
+  }
+  function removeHaving(id: string) {
+    onChange({ ...value, having: value.having.filter((h) => h.id !== id) });
+  }
 
   const MODES: { key: CustomOptionsState["outputMode"]; label: string }[] = [
     { key: "count_sessions", label: "Contar sessões" },
@@ -357,9 +448,6 @@ export function CustomOptions({ events, value, onChange }: CustomOptionsProps) {
     { key: "extract", label: "Extrair linhas" },
     { key: "aggregate", label: "Agregar" },
     { key: "funnel", label: "Funil" },
-  ];
-  const AGG_FUNCS: { key: CustomOptionsState["aggFunc"]; label: string }[] = [
-    { key: "sum", label: "SUM" }, { key: "avg", label: "AVG" }, { key: "min", label: "MIN" }, { key: "max", label: "MAX" }, { key: "count", label: "COUNT" },
   ];
 
   const suggestionIndex = useMemo(() => buildSuggestionIndex(events), [events]);
@@ -486,22 +574,34 @@ export function CustomOptions({ events, value, onChange }: CustomOptionsProps) {
 
       {value.outputMode === "aggregate" && (
         <div className="qb-cb-block">
-          <div className="qb-section-label">Agregar</div>
-          <div className="qb-agg-row">
-            <select className="qb-cond-op" value={value.aggFunc} onChange={(e) => onChange({ ...value, aggFunc: e.target.value as CustomOptionsState["aggFunc"], aggColumn: "" })}>
-              {AGG_FUNCS.map((f) => <option key={f.key} value={f.key}>{f.label}</option>)}
-            </select>
-            <span className="qb-agg-of">de</span>
-            <select className="qb-cond-col" value={value.aggColumn} onChange={(e) => onChange({ ...value, aggColumn: e.target.value })}>
-              <option value="">{value.aggFunc === "count" ? "— todas as linhas (COUNT *) —" : "— escolha uma coluna —"}</option>
-              {value.aggFunc === "count"
-                ? <ColumnOptions />
-                : NUMERIC_COLUMNS.map((c) => <option key={c} value={c}>{c}</option>)}
-            </select>
-          </div>
-          {value.aggFunc !== "count" && !value.aggColumn && (
-            <p className="qb-hint">Escolha uma coluna numérica ({NUMERIC_COLUMNS.join(", ")}).</p>
-          )}
+          <div className="qb-section-label">MÉTRICAS</div>
+          {value.metrics.map((m) => (
+            <div key={m.id}>
+              <div className="qb-cond-row">
+                <select className="qb-cond-op" value={m.func} onChange={(e) => {
+                  const func = e.target.value;
+                  const patch: Partial<AggMetric> = { func };
+                  // Clear a now-invalid column when switching to a numeric func.
+                  if (NUMERIC_AGG_FUNCS.has(func) && !NUMERIC_COLUMNS.includes(m.column)) patch.column = "";
+                  updateMetric(m.id, patch);
+                }}>
+                  {AGG_FUNCTIONS.map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}
+                </select>
+                <span className="qb-agg-of">de</span>
+                <select className="qb-cond-col" value={m.column} onChange={(e) => updateMetric(m.id, { column: e.target.value })}>
+                  <AggColumnOptions func={m.func} />
+                </select>
+                <button type="button" className="qb-cond-x" onClick={() => removeMetric(m.id)} disabled={value.metrics.length <= 1} aria-label="Remover métrica">✕</button>
+              </div>
+              {NUMERIC_AGG_FUNCS.has(m.func) && !NUMERIC_COLUMNS.includes(m.column) && (
+                <p className="qb-hint">Escolha uma coluna numérica ({NUMERIC_COLUMNS.join(", ")}).</p>
+              )}
+              {m.func === "approx_count_distinct" && !m.column && (
+                <p className="qb-hint">Escolha uma coluna.</p>
+              )}
+            </div>
+          ))}
+          <button type="button" className="qb-add" onClick={addMetric}>+ Adicionar métrica</button>
         </div>
       )}
 
@@ -519,6 +619,65 @@ export function CustomOptions({ events, value, onChange }: CustomOptionsProps) {
           {value.groupByDims.length > 0 && (
             <p className="qb-hint">Dimensões: {value.groupByDims.join(", ")}</p>
           )}
+          {value.outputMode === "aggregate" && (
+            <div className="qb-cb-head">
+              <label className="qb-check">
+                <input type="checkbox" checked={value.timeBucketEnabled} onChange={(e) => onChange({ ...value, timeBucketEnabled: e.target.checked })} />
+                Bucket de tempo (opcional)
+              </label>
+              {value.timeBucketEnabled && (
+                <select className="qb-cond-op" value={value.timeBucketUnit} onChange={(e) => onChange({ ...value, timeBucketUnit: e.target.value as CustomOptionsState["timeBucketUnit"] })}>
+                  {TIME_BUCKET_UNITS.map((u) => <option key={u.value} value={u.value}>{u.label}</option>)}
+                </select>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {value.outputMode === "aggregate" && (
+        <div className="qb-cb-block">
+          <div className="qb-section-label">HAVING (FILTRAR GRUPOS)</div>
+          {value.having.map((h) => {
+            const numErr = numericError("gt", h.value);
+            return (
+              <div key={h.id}>
+                <div className="qb-cond-row">
+                  <select className="qb-cond-op" value={h.func} onChange={(e) => {
+                    const func = e.target.value;
+                    const patch: Partial<HavingCond> = { func };
+                    if (NUMERIC_AGG_FUNCS.has(func) && !NUMERIC_COLUMNS.includes(h.column)) patch.column = "";
+                    updateHaving(h.id, patch);
+                  }}>
+                    {AGG_FUNCTIONS.map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}
+                  </select>
+                  <select className="qb-cond-col" value={h.column} onChange={(e) => updateHaving(h.id, { column: e.target.value })}>
+                    <AggColumnOptions func={h.func} />
+                  </select>
+                  <select className="qb-cond-op" value={h.op} onChange={(e) => updateHaving(h.id, { op: e.target.value })}>
+                    {HAVING_OPS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </select>
+                  <input
+                    className={`qb-cond-val review-field-input${numErr ? " qb-cond-val--invalid" : ""}`}
+                    value={h.value}
+                    placeholder="valor"
+                    inputMode="decimal"
+                    aria-invalid={numErr ? true : undefined}
+                    onChange={(e) => updateHaving(h.id, { value: e.target.value })}
+                  />
+                  <button type="button" className="qb-cond-x" onClick={() => removeHaving(h.id)} aria-label="Remover filtro de grupo">✕</button>
+                </div>
+                {h.value.trim() !== "" && NUMERIC_AGG_FUNCS.has(h.func) && !NUMERIC_COLUMNS.includes(h.column) && (
+                  <p className="qb-hint">Escolha uma coluna numérica ({NUMERIC_COLUMNS.join(", ")}).</p>
+                )}
+                {h.value.trim() !== "" && h.func === "approx_count_distinct" && !h.column && (
+                  <p className="qb-hint">Escolha uma coluna.</p>
+                )}
+                {numErr && <p className="qb-hint">{numErr}</p>}
+              </div>
+            );
+          })}
+          <button type="button" className="qb-add" onClick={addHaving}>+ Adicionar filtro de grupo</button>
         </div>
       )}
     </div>

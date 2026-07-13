@@ -21,8 +21,20 @@ ALLOWED_COLUMNS = frozenset(DEFAULT_SCHEMA_CONFIG["column_mapping"].values()) | 
 
 OUTPUT_MODES = ("count_sessions", "count_events", "extract", "aggregate", "funnel")
 MATCH_MODES = ("and", "or")
-AGG_FUNCS = ("sum", "avg", "min", "max", "count")
-_AGG_SQL = {"sum": "SUM", "avg": "AVG", "min": "MIN", "max": "MAX", "count": "COUNT"}
+AGG_FUNCS = ("sum", "avg", "min", "max", "count", "approx_count_distinct", "stddev")
+_AGG_SQL = {
+    "sum": "SUM", "avg": "AVG", "min": "MIN", "max": "MAX", "count": "COUNT",
+    "approx_count_distinct": "APPROX_COUNT_DISTINCT", "stddev": "STDDEV",
+}
+# Aggregate functions that require a numeric column (curated NUMERIC_COLUMNS).
+_NUMERIC_AGG_FUNCS = frozenset({"sum", "avg", "min", "max", "stddev"})
+TIME_BUCKET_UNITS = ("day", "week", "month")
+_TIME_BUCKET_SQL = {
+    "day": "CAST(data AS DATE)",
+    "week": "trunc(CAST(data AS DATE), 'WEEK')",
+    "month": "trunc(CAST(data AS DATE), 'MM')",
+}
+_HAVING_SQL = {"gt": ">", "lt": "<", "gte": ">=", "lte": "<=", "eq": "=", "neq": "<>"}
 # Curated numeric subset of the allow-list; sum/avg/min/max require one of these.
 NUMERIC_COLUMNS = frozenset({"value", "price", "quantity", "discount", "module_position", "indice", "posicao"})
 
@@ -286,6 +298,103 @@ def _funnel_result(payload, table, start_date, end_date):
     }
 
 
+def _agg_expr(func, column):
+    """Compile a validated aggregate SQL expression from func + column. Raises ValueError."""
+    if func not in AGG_FUNCS:
+        raise ValueError(f"Invalid aggregate function: '{func}'. Must be one of {AGG_FUNCS}.")
+    if func == "count":
+        return "COUNT(*)" if not column else f"COUNT({_validate_column(column)})"
+    if func == "approx_count_distinct":
+        if not isinstance(column, str) or not column:
+            raise ValueError("A função 'approx_count_distinct' precisa de uma coluna.")
+        return f"APPROX_COUNT_DISTINCT({_validate_column(column)})"
+    # sum / avg / min / max / stddev -> numeric column required
+    if func in _NUMERIC_AGG_FUNCS:
+        # allow-list first, so an unknown/injected column is rejected as such
+        col = _validate_column(column) if isinstance(column, str) and column else None
+        if col is None or col not in NUMERIC_COLUMNS:
+            raise ValueError(
+                f"A função '{func}' precisa de uma coluna numérica {sorted(NUMERIC_COLUMNS)}, recebi '{column}'."
+            )
+        return f"{_AGG_SQL[func]}({col})"
+    # count and approx_count_distinct are handled above; no other func is possible
+    raise ValueError(f"Invalid aggregate function: '{func}'.")
+
+
+def _agg_alias(func, column):
+    """Deterministic, safe alias from func + (already allow-listed) column."""
+    if func == "count":
+        return "total" if not column else f"count_{column}"
+    if func == "approx_count_distinct":
+        return f"approx_distinct_{column}"
+    return f"{func}_{column}"
+
+
+def _dedupe_aliases(aliases):
+    """Suffix duplicates in list order: a, a -> a, a_2, a_3, ..."""
+    seen = {}
+    out = []
+    for a in aliases:
+        if a in seen:
+            seen[a] += 1
+            out.append(f"{a}_{seen[a]}")
+        else:
+            seen[a] = 1
+            out.append(a)
+    return out
+
+
+def _compile_metrics(metrics):
+    """Compile the metrics list into ('EXPR AS alias', ...) SELECT terms and their aliases."""
+    if not isinstance(metrics, list) or not metrics:
+        raise ValueError("aggregate.metrics precisa de ao menos uma métrica.")
+    exprs = []
+    raw_aliases = []
+    for m in metrics:
+        if not isinstance(m, dict):
+            raise ValueError("Cada métrica deve ser um objeto.")
+        func = m.get("func")
+        column = m.get("column")
+        exprs.append(_agg_expr(func, column))
+        raw_aliases.append(_agg_alias(func, column if isinstance(column, str) and column else None))
+    aliases = _dedupe_aliases(raw_aliases)
+    select_terms = [f"{e} AS {a}" for e, a in zip(exprs, aliases)]
+    return select_terms, aliases
+
+
+def _compile_having(having):
+    """Compile the optional HAVING list into ('<agg> <op> <num> AND ...', count)."""
+    if having is None:
+        return "", 0
+    if not isinstance(having, list):
+        raise ValueError("aggregate.having deve ser uma lista.")
+    parts = []
+    for h in having:
+        if not isinstance(h, dict):
+            raise ValueError("Cada condição HAVING deve ser um objeto.")
+        expr = _agg_expr(h.get("func"), h.get("column"))
+        op = h.get("op")
+        if op not in _HAVING_SQL:
+            raise ValueError(f"Operador HAVING inválido: '{op}'.")
+        val = str(h.get("value", "")).strip()
+        if not _NUMERIC_RE.match(val):
+            raise ValueError(f"HAVING precisa de um valor numérico, recebi '{h.get('value')}'.")
+        parts.append(f"{expr} {_HAVING_SQL[op]} {val}")
+    return " AND ".join(parts), len(parts)
+
+
+def _time_bucket_expr(spec):
+    """Return the SQL expression for a time bucket, or None. Raises ValueError on a bad unit."""
+    if spec is None:
+        return None
+    if not isinstance(spec, dict):
+        raise ValueError("time_bucket deve ser um objeto.")
+    unit = spec.get("unit")
+    if unit not in TIME_BUCKET_UNITS:
+        raise ValueError(f"time_bucket.unit inválido: '{unit}'. Deve ser um de {TIME_BUCKET_UNITS}.")
+    return _TIME_BUCKET_SQL[unit]
+
+
 def build_custom_query(payload, start_date, end_date=None, schema_config=None):
     """Build Databricks SQL from a structured custom-query payload.
 
@@ -346,32 +455,28 @@ def build_custom_query(payload, start_date, end_date=None, schema_config=None):
         agg_spec = payload.get("aggregate")
         if not isinstance(agg_spec, dict):
             raise ValueError("aggregate must be an object.")
-        func = agg_spec.get("func")
-        if func not in AGG_FUNCS:
-            raise ValueError(f"Invalid aggregate function: '{func}'. Must be one of {AGG_FUNCS}.")
-        column = agg_spec.get("column")
-        if func == "count":
-            agg_expr = "COUNT(*)" if not column else f"COUNT({_validate_column(column)})"
-        else:
-            if not isinstance(column, str) or column not in NUMERIC_COLUMNS:
-                raise ValueError(
-                    f"A função '{func}' precisa de uma coluna numérica {sorted(NUMERIC_COLUMNS)}, recebi '{column}'."
-                )
-            agg_expr = f"{_AGG_SQL[func]}({column})"
-        agg = f"{agg_expr} AS resultado"
-        if group_by:
-            cols = ", ".join(group_by)
-            query = (
-                f"SELECT {cols}, {agg}\n"
-                f"FROM {table}\n"
-                f"WHERE {where}\n"
-                f"GROUP BY {cols}\n"
-                f"ORDER BY resultado DESC"
-            )
-        else:
-            query = f"SELECT {agg}\nFROM {table}\nWHERE {where}"
+        select_terms, aliases = _compile_metrics(agg_spec.get("metrics"))
+        having_clause, having_count = _compile_having(agg_spec.get("having"))
+        bucket_expr = _time_bucket_expr(payload.get("time_bucket"))
+
+        select_dims = ([f"{bucket_expr} AS periodo"] if bucket_expr else []) + group_by
+        group_by_sql = ([bucket_expr] if bucket_expr else []) + group_by
+        select_list = ", ".join(select_dims + select_terms)
+
+        query = f"SELECT {select_list}\nFROM {table}\nWHERE {where}"
+        if group_by_sql:
+            query += f"\nGROUP BY {', '.join(group_by_sql)}"
+        if having_clause:
+            query += f"\nHAVING {having_clause}"
+        if bucket_expr:
+            query += "\nORDER BY periodo ASC"
+        elif group_by:
+            query += f"\nORDER BY {aliases[0]} DESC"
+
         return {"query": query, "metadata": {**base_meta, "output_mode": output_mode,
-                                             "func": func, "column": column, "group_by": group_by, "limit": None}}
+                "metric_count": len(aliases), "group_by": group_by,
+                "has_time_bucket": bucket_expr is not None,
+                "having_count": having_count, "limit": None}}
 
     # count_sessions / count_events
     agg = "COUNT(DISTINCT ga_session_id) AS session_count" if output_mode == "count_sessions" else "COUNT(*) AS event_count"
