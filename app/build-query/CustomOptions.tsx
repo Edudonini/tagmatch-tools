@@ -1,5 +1,7 @@
 "use client";
 
+import { useMemo } from "react";
+
 export type SpecEvent = Record<string, unknown>;
 
 export type Condition = { id: string; column: string; op: string; value: string };
@@ -123,7 +125,10 @@ function buildSuggestionIndex(events: SpecEvent[]): Record<string, string[]> {
   const allowed = new Set(ALL_COLUMNS);
   const acc: Record<string, Set<string>> = {};
   const add = (col: string, raw: unknown) => {
-    const v = String(raw ?? "").trim();
+    // Only scalar spec fields yield suggestions; skip arrays/objects so a
+    // non-flat field never surfaces as "[object Object]".
+    if (typeof raw !== "string" && typeof raw !== "number") return;
+    const v = String(raw).trim();
     if (!v) return;
     (acc[col] ??= new Set()).add(v);
   };
@@ -288,7 +293,7 @@ export function CustomOptions({ events, value, onChange }: CustomOptionsProps) {
     { key: "sum", label: "SUM" }, { key: "avg", label: "AVG" }, { key: "min", label: "MIN" }, { key: "max", label: "MAX" }, { key: "count", label: "COUNT" },
   ];
 
-  const suggestionIndex = buildSuggestionIndex(events);
+  const suggestionIndex = useMemo(() => buildSuggestionIndex(events), [events]);
 
   return (
     <div className="qb-custom">
