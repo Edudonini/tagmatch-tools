@@ -436,6 +436,34 @@ def test_aggregate_metadata():
     assert res["metadata"]["having_count"] == 1
 
 
+def test_aggregate_non_dict_metric_rejected():
+    with pytest.raises(ValueError, match="Cada métrica deve ser um objeto"):
+        _q(_aggq(["not-a-dict"]))
+
+
+def test_aggregate_non_list_having_rejected():
+    with pytest.raises(ValueError, match="aggregate.having deve ser uma lista"):
+        _q(_aggq([_metric("count")], having="nope"))
+
+
+def test_aggregate_non_dict_having_entry_rejected():
+    with pytest.raises(ValueError, match="Cada condição HAVING deve ser um objeto"):
+        _q(_aggq([_metric("count")], having=["nope"]))
+
+
+def test_aggregate_non_dict_time_bucket_rejected():
+    with pytest.raises(ValueError, match="time_bucket deve ser um objeto"):
+        _q(_aggq([_metric("count")], time_bucket="nope"))
+
+
+def test_aggregate_grand_total_with_having_no_group_by():
+    q = _q(_aggq([_metric("count")], having=[{"func": "count", "column": None, "op": "gt", "value": "5"}]))
+    assert "SELECT COUNT(*) AS total" in q
+    assert "HAVING COUNT(*) > 5" in q
+    assert "GROUP BY" not in q
+    assert "ORDER BY" not in q
+
+
 # --- enums / shapes / metadata ---
 
 def test_invalid_output_mode_rejected():
