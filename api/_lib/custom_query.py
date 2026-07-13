@@ -19,7 +19,7 @@ ALLOWED_COLUMNS = frozenset(DEFAULT_SCHEMA_CONFIG["column_mapping"].values()) | 
     "ga_session_id", "data", "event_timestamp", "previousScreenName",
 }
 
-OUTPUT_MODES = ("count_sessions", "count_events", "extract", "aggregate")
+OUTPUT_MODES = ("count_sessions", "count_events", "extract", "aggregate", "funnel")
 MATCH_MODES = ("and", "or")
 AGG_FUNCS = ("sum", "avg", "min", "max", "count")
 _AGG_SQL = {"sum": "SUM", "avg": "AVG", "min": "MIN", "max": "MAX", "count": "COUNT"}
@@ -29,6 +29,7 @@ NUMERIC_COLUMNS = frozenset({"value", "price", "quantity", "discount", "module_p
 DEFAULT_EXTRACT_COLUMNS = ("data", "event_timestamp", "event_name", "screenName", "ga_session_id")
 DEFAULT_LIMIT = 1000
 MAX_LIMIT = 10000
+FUNNEL_MAX_STEPS = 10
 
 _NUMERIC_RE = re.compile(r"^-?\d+(\.\d+)?$")
 
@@ -172,6 +173,119 @@ def _clamp_limit(raw):
     return max(1, min(MAX_LIMIT, n))
 
 
+def _build_funnel_query(funnel_spec, table, base_where):
+    """Build an ordered multi-event session funnel (Approach A: layered CTEs).
+
+    Returns (query, step_count, total_condition_count). Raises ValueError on
+    invalid input. Each step reuses _compile_group (column/op/value validated);
+    labels are emitted only as _quote-escaped string literals.
+    """
+    if not isinstance(funnel_spec, dict):
+        raise ValueError("funnel deve ser um objeto.")
+    steps = funnel_spec.get("steps")
+    if not isinstance(steps, list):
+        raise ValueError("funnel.steps deve ser uma lista.")
+    if len(steps) < 2:
+        raise ValueError("O funil precisa de ao menos 2 etapas.")
+    if len(steps) > FUNNEL_MAX_STEPS:
+        raise ValueError(f"O funil aceita no máximo {FUNNEL_MAX_STEPS} etapas.")
+
+    clauses = []
+    labels = []
+    total_conditions = 0
+    for i, step in enumerate(steps, start=1):
+        if not isinstance(step, dict):
+            raise ValueError("Cada etapa deve ser um objeto.")
+        clause = _compile_group(step)  # validates every column/op/value; "" if no conditions
+        if not clause:
+            raise ValueError("Cada etapa do funil precisa de ao menos uma condição.")
+        clauses.append(clause)
+        total_conditions += len(step.get("conditions", []) or [])
+        raw = step.get("label")
+        if raw is None or (isinstance(raw, str) and not raw.strip()):
+            labels.append(f"Etapa {i}")
+        elif isinstance(raw, str):
+            labels.append(raw)
+        else:
+            raise ValueError("O rótulo da etapa precisa ser texto.")
+
+    n = len(steps)
+
+    flags = ",\n    ".join(
+        f"CASE WHEN {clauses[i]} THEN 1 ELSE 0 END AS s{i + 1}" for i in range(n)
+    )
+    base_cte = (
+        "base AS (\n"
+        "  SELECT ga_session_id, event_timestamp,\n"
+        f"    {flags}\n"
+        f"  FROM {table}\n"
+        f"  WHERE {base_where}\n"
+        ")"
+    )
+
+    t_ctes = [
+        "t1 AS (\n"
+        "  SELECT ga_session_id, MIN(CASE WHEN s1 = 1 THEN event_timestamp END) AS ts1\n"
+        "  FROM base GROUP BY ga_session_id\n"
+        ")"
+    ]
+    for k in range(2, n + 1):
+        prev = k - 1
+        t_ctes.append(
+            f"t{k} AS (\n"
+            f"  SELECT b.ga_session_id, p.ts{prev},\n"
+            f"    MIN(CASE WHEN b.s{k} = 1 AND b.event_timestamp > p.ts{prev} THEN b.event_timestamp END) AS ts{k}\n"
+            f"  FROM base b JOIN t{prev} p ON b.ga_session_id = p.ga_session_id\n"
+            f"  WHERE p.ts{prev} IS NOT NULL\n"
+            f"  GROUP BY b.ga_session_id, p.ts{prev}\n"
+            ")"
+        )
+
+    count_lines = ",\n    ".join(
+        f"(SELECT COUNT(*) FROM t{k} WHERE ts{k} IS NOT NULL) AS c{k}" for k in range(1, n + 1)
+    )
+    counts_cte = f"counts AS (\n  SELECT\n    {count_lines}\n)"
+
+    all_ctes = ",\n".join([base_cte] + t_ctes + [counts_cte])
+
+    union_rows = []
+    for k in range(1, n + 1):
+        label_lit = _quote(labels[k - 1])
+        if k == 1:
+            union_rows.append(
+                f"SELECT 1 AS ordem, {label_lit} AS etapa, c1 AS sessoes, "
+                "100.0 AS pct_etapa1, CAST(NULL AS DOUBLE) AS pct_anterior FROM counts"
+            )
+        else:
+            union_rows.append(
+                f"SELECT {k}, {label_lit}, c{k}, "
+                f"ROUND(100.0 * c{k} / NULLIF(c1, 0), 1), "
+                f"ROUND(100.0 * c{k} / NULLIF(c{k - 1}, 0), 1) FROM counts"
+            )
+    union_sql = "\nUNION ALL\n".join(union_rows)
+
+    query = f"WITH {all_ctes}\n{union_sql}\nORDER BY ordem"
+    return query, n, total_conditions
+
+
+def _funnel_result(payload, table, start_date, end_date):
+    base_where_parts = [_date_filter(start_date, end_date)]
+    global_clause = _compile_filter(payload.get("filter") or {})
+    if global_clause:
+        base_where_parts.append(global_clause)
+    base_where = " AND ".join(base_where_parts)
+    query, step_count, condition_count = _build_funnel_query(payload.get("funnel"), table, base_where)
+    return {
+        "query": query,
+        "metadata": {
+            "output_mode": "funnel",
+            "step_count": step_count,
+            "condition_count": condition_count,
+            "has_global_filter": bool(global_clause),
+        },
+    }
+
+
 def build_custom_query(payload, start_date, end_date=None, schema_config=None):
     """Build Databricks SQL from a structured custom-query payload.
 
@@ -185,6 +299,9 @@ def build_custom_query(payload, start_date, end_date=None, schema_config=None):
         raise ValueError(f"Invalid output_mode: '{output_mode}'. Must be one of {OUTPUT_MODES}.")
 
     table = (schema_config or DEFAULT_SCHEMA_CONFIG)["table_name"]
+
+    if output_mode == "funnel":
+        return _funnel_result(payload, table, start_date, end_date)
 
     where_parts = [_date_filter(start_date, end_date)]
     main_clause = _compile_filter(payload.get("filter") or {})
