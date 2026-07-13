@@ -229,7 +229,9 @@ export function buildCustomPayload(state: CustomOptionsState): Record<string, un
       metrics: state.metrics.map((m) => ({ func: m.func, column: m.column || null })),
     };
     const having = state.having
-      .filter((h) => h.value.trim() !== "" || !NUMERIC_AGG_FUNCS.has(h.func))
+      // Every HAVING row needs a numeric value; drop rows the user started but
+      // left blank so an unfinished row does not 400 (the server rejects "").
+      .filter((h) => h.value.trim() !== "")
       .map((h) => ({ func: h.func, column: h.column || null, op: h.op, value: h.value }));
     if (having.length > 0) aggregate.having = having;
     payload.aggregate = aggregate;
@@ -576,7 +578,13 @@ export function CustomOptions({ events, value, onChange }: CustomOptionsProps) {
           {value.metrics.map((m) => (
             <div key={m.id}>
               <div className="qb-cond-row">
-                <select className="qb-cond-op" value={m.func} onChange={(e) => updateMetric(m.id, { func: e.target.value })}>
+                <select className="qb-cond-op" value={m.func} onChange={(e) => {
+                  const func = e.target.value;
+                  const patch: Partial<AggMetric> = { func };
+                  // Clear a now-invalid column when switching to a numeric func.
+                  if (NUMERIC_AGG_FUNCS.has(func) && !NUMERIC_COLUMNS.includes(m.column)) patch.column = "";
+                  updateMetric(m.id, patch);
+                }}>
                   {AGG_FUNCTIONS.map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}
                 </select>
                 <span className="qb-agg-of">de</span>
@@ -587,6 +595,9 @@ export function CustomOptions({ events, value, onChange }: CustomOptionsProps) {
               </div>
               {NUMERIC_AGG_FUNCS.has(m.func) && !NUMERIC_COLUMNS.includes(m.column) && (
                 <p className="qb-hint">Escolha uma coluna numérica ({NUMERIC_COLUMNS.join(", ")}).</p>
+              )}
+              {m.func === "approx_count_distinct" && !m.column && (
+                <p className="qb-hint">Escolha uma coluna.</p>
               )}
             </div>
           ))}
@@ -632,7 +643,12 @@ export function CustomOptions({ events, value, onChange }: CustomOptionsProps) {
             return (
               <div key={h.id}>
                 <div className="qb-cond-row">
-                  <select className="qb-cond-op" value={h.func} onChange={(e) => updateHaving(h.id, { func: e.target.value })}>
+                  <select className="qb-cond-op" value={h.func} onChange={(e) => {
+                    const func = e.target.value;
+                    const patch: Partial<HavingCond> = { func };
+                    if (NUMERIC_AGG_FUNCS.has(func) && !NUMERIC_COLUMNS.includes(h.column)) patch.column = "";
+                    updateHaving(h.id, patch);
+                  }}>
                     {AGG_FUNCTIONS.map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}
                   </select>
                   <select className="qb-cond-col" value={h.column} onChange={(e) => updateHaving(h.id, { column: e.target.value })}>
@@ -651,6 +667,12 @@ export function CustomOptions({ events, value, onChange }: CustomOptionsProps) {
                   />
                   <button type="button" className="qb-cond-x" onClick={() => removeHaving(h.id)} aria-label="Remover filtro de grupo">✕</button>
                 </div>
+                {h.value.trim() !== "" && NUMERIC_AGG_FUNCS.has(h.func) && !NUMERIC_COLUMNS.includes(h.column) && (
+                  <p className="qb-hint">Escolha uma coluna numérica ({NUMERIC_COLUMNS.join(", ")}).</p>
+                )}
+                {h.value.trim() !== "" && h.func === "approx_count_distinct" && !h.column && (
+                  <p className="qb-hint">Escolha uma coluna.</p>
+                )}
                 {numErr && <p className="qb-hint">{numErr}</p>}
               </div>
             );
