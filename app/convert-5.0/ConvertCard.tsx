@@ -16,8 +16,8 @@ const CONFIDENCE_LABEL: Record<ConvField["confidence"], string> = {
 
 export function ConvertCard({ event, onChange }: ConvertCardProps) {
   function updateField(key: string, value: string) {
-    const norm = key === "screenName" || key === "error_code" ? value : value; // normalized on blur, not per keystroke
-    onChange({ ...event, fields: { ...event.fields, [key]: { ...event.fields[key], value: norm } } });
+    // Keystrokes store the raw value; snake normalization happens on blur (except screenName/error_code).
+    onChange({ ...event, fields: { ...event.fields, [key]: { ...event.fields[key], value } } });
   }
   function normalizeField(key: string) {
     if (key === "screenName" || key === "error_code") return;
