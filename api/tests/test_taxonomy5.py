@@ -9,7 +9,8 @@ from api._lib.taxonomy5 import normalize, convert_events, derive_screen_name
 
 def test_normalize_snake_ascii():
     assert normalize("Confirmar recarga") == "confirmar_recarga"
-    assert normalize("Emissão de 2ª via!") == "emissao_de_2_via"
+    # ª (ordinal indicator) NFKD-decomposes to a plain "a", so 2ª -> 2a.
+    assert normalize("Emissão de 2ª via!") == "emissao_de_2a_via"
     assert normalize("já-foi/ok") == "ja_foi_ok"
     assert normalize("") == ""
     assert normalize(None) == ""

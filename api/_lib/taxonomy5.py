@@ -23,12 +23,7 @@ _ACAO = {"screen_view": "visualizacao", "noninteraction": "visualizacao", "inter
 
 
 def _strip_accents(text):
-    # Ordinal indicators (ª/º) NFKD-decompose to a plain letter ("a"/"o"),
-    # not a combining mark, so the combining-mark filter below would keep
-    # them as literal letters (e.g. "2ª" -> "2a"). Strip them explicitly
-    # first so they are dropped like other punctuation instead.
-    s = str(text).replace("ª", "").replace("º", "")
-    nfkd = unicodedata.normalize("NFKD", s)
+    nfkd = unicodedata.normalize("NFKD", str(text))
     return "".join(c for c in nfkd if not unicodedata.combining(c))
 
 
