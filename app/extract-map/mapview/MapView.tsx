@@ -139,7 +139,7 @@ export function MapView({ rows, report, onReview }: MapViewProps) {
     });
   }
 
-  function handoff(dest: "/build-query" | "/match") {
+  function handoff(dest: "/build-query" | "/match" | "/convert-5.0") {
     storeSpecHandoff(rows);
     router.push(dest);
   }
@@ -165,6 +165,9 @@ export function MapView({ rows, report, onReview }: MapViewProps) {
         </button>
         <button className="btn btn-primary" onClick={() => handoff("/match")}>
           Seguir para Matching →
+        </button>
+        <button className="btn btn-primary" onClick={() => handoff("/convert-5.0")}>
+          Converter para 5.0 →
         </button>
       </div>
 

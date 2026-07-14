@@ -530,7 +530,7 @@
             <div class="prow"><div class="pk">screenName</div><div class="pd">Caminho da tela, em português, sem prefixo napp. <div class="enums"><span class="en">/[jornada]/[tela]</span></div></div></div>
             <div class="prow"><div class="pk">origin_nv</div><div class="pd">Origem do entry point. <div class="enums"><span class="en">home</span><span class="en">menu</span><span class="en">push</span><span class="en">deeplink</span></div></div></div>
             <div class="prow"><div class="pk">event_access_type</div><div class="pd">Tipo de acesso. <div class="enums"><span class="en">vivo</span><span class="en">b2c</span><span class="en">b2b_m</span><span class="en">b2b_c</span></div></div></div>
-            <div class="prow"><div class="pk">client_category</div><div class="pd">Categoria do cliente. <div class="enums"><span class="en">admPrin</span><span class="en">adm</span><span class="en">tec</span><span class="en">cob</span><span class="en">soc</span><span class="en">b2c_not-apply</span></div></div></div>
+            <div class="prow"><div class="pk">client_category</div><div class="pd">Categoria do cliente. <div class="enums"><span class="en">adm_prin</span><span class="en">adm</span><span class="en">tec</span><span class="en">cob</span><span class="en">soc</span><span class="en">b2c_not_apply</span><span class="en">vivo_not_apply</span></div></div></div>
             <div class="prow"><div class="pk">department</div><div class="pd">Departamento — definido pela Squad. <div class="enums"><span class="en">financeiro</span><span class="en">comercial</span><span class="en">suporte</span></div></div></div>
             <div class="prow"><div class="pk">macro_journey</div><div class="pd">Nome da jornada. <div class="enums"><span class="en">ex: Fatura</span></div></div></div>
             <div class="prow"><div class="pk">micro_journey</div><div class="pd">Etapa dentro da jornada, com contexto. <div class="enums"><span class="en">ex: Consulta da fatura atual</span></div></div></div>
@@ -548,7 +548,7 @@
           </div>
           <div class="params">
             <div class="prow"><div class="pk">event</div><div class="pd">Tipo do evento. <div class="enums"><span class="en hl" style="--tone: var(--int); --tone-soft: var(--int-soft)">interaction</span><span class="en hl" style="--tone: var(--nonint); --tone-soft: var(--nonint-soft)">noninteraction</span></div></div></div>
-            <div class="prow"><div class="pk">component_type</div><div class="pd">Tipo do componente, em inglês. <div class="enums"><span class="en">button</span><span class="en">card</span><span class="en">link</span><span class="en">alert</span><span class="en">banner</span><span class="en">input</span></div></div></div>
+            <div class="prow"><div class="pk">component_type</div><div class="pd">Tipo do componente, em inglês. <div class="enums"><span class="en">button</span><span class="en">card</span><span class="en">link</span><span class="en">alert</span><span class="en">banner</span><span class="en">input</span><span class="en">modal</span><span class="en">toggle</span><span class="en">checkbox</span><span class="en">video</span><span class="en">dropdown</span></div></div></div>
             <div class="prow"><div class="pk">component_copy</div><div class="pd">Texto exibido na tela ou no elemento. <div class="enums"><span class="en">ex: Continuar</span></div></div></div>
           </div>
           <div class="dp-note">Todos os demais campos do conjunto base (<span style="font-family:var(--mono)">screenName, origin_nv, department, macro_journey, micro_journey, event_detail, status_journey…</span>) continuam obrigatórios.</div>
@@ -576,7 +576,7 @@
           </div>
           <div class="params">
             <div class="prow"><div class="pk">plan_name</div><div class="pd">Nome do plano. <div class="enums"><span class="en">ex: Vivo Controle 15GB</span></div></div></div>
-            <div class="prow"><div class="pk">event_plan_type</div><div class="pd">Tipo do plano. <div class="enums"><span class="en">pre</span><span class="en">pos</span><span class="en">controle</span><span class="en">fixa</span><span class="en">easy</span><span class="en">movelCorporativo</span><span class="en">fixoCorporativo</span></div></div></div>
+            <div class="prow"><div class="pk">event_plan_type</div><div class="pd">Tipo do plano. <div class="enums"><span class="en">pre</span><span class="en">pos</span><span class="en">controle</span><span class="en">fixa</span><span class="en">easy</span><span class="en">movel_corporativo</span><span class="en">fixo_corporativo</span></div></div></div>
           </div>
         </div>
 
@@ -615,7 +615,7 @@
                 <div class="p chg"><span class="k">screenName</span><span class="v">/fatura/detalhe-da-fatura</span></div>
                 <div class="p"><span class="k">origin_nv</span><span class="v">home</span></div>
                 <div class="p"><span class="k">event_access_type</span><span class="v">b2c</span></div>
-                <div class="p"><span class="k">client_category</span><span class="v">b2c_not-apply</span></div>
+                <div class="p"><span class="k">client_category</span><span class="v">b2c_not_apply</span></div>
                 <div class="p add"><span class="k">department</span><span class="v">financeiro</span></div>
                 <div class="p add"><span class="k">macro_journey</span><span class="v">Fatura</span></div>
                 <div class="p add"><span class="k">micro_journey</span><span class="v">Consulta da fatura atual</span></div>
@@ -651,7 +651,7 @@
                 <div class="p chg"><span class="k">screenName</span><span class="v">/recarga/valor-da-recarga</span></div>
                 <div class="p"><span class="k">origin_nv</span><span class="v">home</span></div>
                 <div class="p"><span class="k">event_access_type</span><span class="v">b2c</span></div>
-                <div class="p"><span class="k">client_category</span><span class="v">b2c_not-apply</span></div>
+                <div class="p"><span class="k">client_category</span><span class="v">b2c_not_apply</span></div>
                 <div class="p add"><span class="k">department</span><span class="v">comercial</span></div>
                 <div class="p add"><span class="k">macro_journey</span><span class="v">Recarga</span></div>
                 <div class="p add"><span class="k">micro_journey</span><span class="v">Seleção do valor de recarga</span></div>
@@ -690,7 +690,7 @@
                 <div class="p chg"><span class="k">screenName</span><span class="v">/suporte-tecnico/diagnostico</span></div>
                 <div class="p"><span class="k">origin_nv</span><span class="v">menu</span></div>
                 <div class="p"><span class="k">event_access_type</span><span class="v">b2c</span></div>
-                <div class="p"><span class="k">client_category</span><span class="v">b2c_not-apply</span></div>
+                <div class="p"><span class="k">client_category</span><span class="v">b2c_not_apply</span></div>
                 <div class="p add"><span class="k">department</span><span class="v">suporte</span></div>
                 <div class="p add"><span class="k">macro_journey</span><span class="v">Suporte Técnico</span></div>
                 <div class="p add"><span class="k">micro_journey</span><span class="v">Diagnóstico automático da conexão</span></div>
@@ -732,7 +732,7 @@
                 <div class="p chg"><span class="k">screenName</span><span class="v">/troca-de-plano/planos-disponiveis</span></div>
                 <div class="p"><span class="k">origin_nv</span><span class="v">home</span></div>
                 <div class="p"><span class="k">event_access_type</span><span class="v">b2c</span></div>
-                <div class="p"><span class="k">client_category</span><span class="v">b2c_not-apply</span></div>
+                <div class="p"><span class="k">client_category</span><span class="v">b2c_not_apply</span></div>
                 <div class="p add"><span class="k">department</span><span class="v">comercial</span></div>
                 <div class="p add"><span class="k">macro_journey</span><span class="v">Troca de Plano</span></div>
                 <div class="p add"><span class="k">micro_journey</span><span class="v">Seleção do novo plano</span></div>

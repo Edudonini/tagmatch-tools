@@ -29,6 +29,13 @@ const TOOLS = [
     desc: "Parse and merge Logcat/NDJSON/Dev JSON/Firebase logs into one events table.",
     available: true,
   },
+  {
+    href: "/convert-5.0",
+    glyph: "5.0",
+    name: "Converter para 5.0",
+    desc: "Convert an extracted App 4 map to the App 5.0 taxonomy, with journey-context assist.",
+    available: true,
+  },
 ];
 
 export default function Home() {
