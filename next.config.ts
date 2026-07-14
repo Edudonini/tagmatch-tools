@@ -13,6 +13,7 @@ const nextConfig: NextConfig = {
         { source: "/api/extract-logs", destination: "http://127.0.0.1:5328/api/extract-logs" },
         { source: "/api/build-query", destination: "http://127.0.0.1:5328/api/build-query" },
         { source: "/api/match", destination: "http://127.0.0.1:5328/api/match" },
+        { source: "/api/convert-taxonomy", destination: "http://127.0.0.1:5328/api/convert-taxonomy" },
       ];
     }
     return always;
