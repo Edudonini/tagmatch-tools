@@ -740,6 +740,11 @@ def test_aggregate_empty_alias_falls_back_to_auto():
     assert "SUM(value) AS sum_value" in q
 
 
+def test_aggregate_non_string_alias_rejected():
+    with pytest.raises(ValueError, match="alias"):
+        _q(_aggq([{"func": "sum", "column": "value", "alias": 123}]))
+
+
 def test_aggregate_having_or():
     q = _q(_aggq_hm([_metric("sum", "value")],
                     [{"func": "count", "column": None, "op": "gt", "value": "100"},

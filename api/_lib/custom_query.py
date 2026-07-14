@@ -377,6 +377,8 @@ def _compile_metrics(metrics):
         column = m.get("column")
         exprs.append(_agg_expr(func, column, m.get("p")))
         user_alias = m.get("alias")
+        if user_alias is not None and not isinstance(user_alias, str):
+            raise ValueError("O alias da métrica precisa ser texto.")
         if isinstance(user_alias, str) and user_alias.strip():
             alias = user_alias.strip()
             if not _ALIAS_RE.match(alias):
