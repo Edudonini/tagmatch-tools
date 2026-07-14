@@ -50,6 +50,11 @@ export function isRawField(key: string): boolean {
   return key === "screenName" || key === "error_code";
 }
 
+// True for a known 5.0 field (base/component/error/product); false for passthrough.
+export function isKnownField(key: string): boolean {
+  return KNOWN_FIELDS.includes(key);
+}
+
 // The ordered list of active field keys: the known sets by toggle, then any
 // passthrough fields carried from the old event (crm_name, payment_method, …).
 export function activeFields(ev: ConvEvent): string[] {

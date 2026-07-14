@@ -152,6 +152,19 @@ def test_convert_plan_placeholder_carried_from_old():
     assert out["fields"]["plan_name"]["value"] == "[nomeDoPlano]"
 
 
+def test_convert_passthrough_skips_blank_and_non_scalar():
+    # extracted rows pad many empty SUPPORTED_KEYS; blanks and non-scalars must not surface
+    out = convert_events([{
+        "name": "screen_view", "sn": "/napp/x",
+        "crm_name": "", "payment_method": None, "nested": {"a": 1}, "listy": [1, 2],
+        "extra": "keep",
+    }])[0]
+    f = out["fields"]
+    assert "crm_name" not in f and "payment_method" not in f
+    assert "nested" not in f and "listy" not in f
+    assert f["extra"]["value"] == "keep"
+
+
 def test_convert_rejects_non_list():
     with pytest.raises(ValueError):
         convert_events({"not": "a list"})

@@ -1,7 +1,7 @@
 "use client";
 
 import { badgeClass, badgeLabel } from "../_lib/ResultsPanel";
-import { ENUMS, activeFields, isRawField, normalize, toBlock, validate, withToggles, type ConvEvent, type ConvField } from "./taxonomy5";
+import { ENUMS, activeFields, isKnownField, isRawField, normalize, toBlock, validate, withToggles, type ConvEvent, type ConvField } from "./taxonomy5";
 
 type ConvertCardProps = {
   event: ConvEvent;
@@ -20,7 +20,9 @@ export function ConvertCard({ event, onChange }: ConvertCardProps) {
     onChange({ ...event, fields: { ...event.fields, [key]: { ...event.fields[key], value } } });
   }
   function normalizeField(key: string) {
-    if (isRawField(key)) return;
+    // Raw fields (screenName/error_code) and passthrough fields are kept verbatim,
+    // matching validate()'s exemption; only known free-text fields are snaked.
+    if (isRawField(key) || !isKnownField(key)) return;
     const cur = event.fields[key]?.value ?? "";
     if (/^\[.*\]$/.test(cur.trim())) return; // dynamic placeholder, e.g. [nome_do_plano]
     const n = normalize(cur);

@@ -194,10 +194,16 @@ def convert_event(ev):
         fields["plan_name"] = _f(_old(ev, "plan_name") or "[nome_do_plano]", "review")
         fields["event_plan_type"] = _f(_old(ev, "event_plan_type") or "[tipo_do_plano]", "review")
 
-    # --- passthrough: any other old field not already mapped is carried through ---
+    # --- passthrough: any other non-empty scalar old field is carried through
+    # (skip blanks — extracted rows pad many empty SUPPORTED_KEYS — and non-scalars) ---
     for k, v in ev.items():
-        if _carryable(k) and k not in fields:
-            fields[k] = _f(str(v).strip() if v is not None else "", "review")
+        if not _carryable(k) or k in fields:
+            continue
+        if not isinstance(v, (str, int, float, bool)):
+            continue
+        sv = str(v).strip()
+        if sv:
+            fields[k] = _f(sv, "review")
 
     return {
         "event_kind": kind,
