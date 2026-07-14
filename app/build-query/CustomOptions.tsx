@@ -199,6 +199,9 @@ const SPEC_FIELD_TO_COLUMN: Record<string, string> = {
   lb: "eventLabel",
 };
 
+// Max distinct values offered per column in a datalist.
+const SUGGESTION_CAP = 50;
+
 // Build column -> distinct spec values (advisory autocomplete only; the server
 // still validates/escapes every value). Empty for columns with no spec values.
 function buildSuggestionIndex(events: SpecEvent[]): Record<string, string[]> {
@@ -222,9 +225,82 @@ function buildSuggestionIndex(events: SpecEvent[]): Record<string, string[]> {
   }
   const out: Record<string, string[]> = {};
   for (const [col, set] of Object.entries(acc)) {
-    out[col] = Array.from(set).sort().slice(0, 50);
+    out[col] = Array.from(set).sort().slice(0, SUGGESTION_CAP);
   }
   return out;
+}
+
+// Reverse of SPEC_FIELD_TO_COLUMN: a Silver column -> the spec's short field.
+// Allow-listed spec keys map to themselves (identity), handled in eventValueForColumn.
+const COLUMN_TO_SPEC_FIELD: Record<string, string> = Object.fromEntries(
+  Object.entries(SPEC_FIELD_TO_COLUMN).map(([field, col]) => [col, field])
+);
+
+// The event's scalar value for a Silver column, or undefined if absent/empty/non-scalar.
+// Reads the same sources buildSuggestionIndex uses: the mapped short field
+// (sn/name/ct/ac/lb) and, as a fallback, a direct allow-listed key of the same
+// name — so a value that appears in the datalist is also visible to matching.
+export function eventValueForColumn(event: SpecEvent, column: string): string | undefined {
+  const rec = event as Record<string, unknown>;
+  const field = COLUMN_TO_SPEC_FIELD[column] ?? column;
+  const raw = rec[field] ?? (field !== column ? rec[column] : undefined);
+  if (typeof raw !== "string" && typeof raw !== "number") return undefined;
+  const v = String(raw).trim();
+  return v || undefined;
+}
+
+// From the OTHER conditions in a group, the ones that constrain suggestions:
+// eq/in with a non-empty value on a real column. `in` splits its comma list.
+export function contextConstraints(
+  conditions: { id: string; column: string; op: string; value: string }[],
+  targetId: string
+): { column: string; values: string[] }[] {
+  const out: { column: string; values: string[] }[] = [];
+  for (const c of conditions) {
+    if (c.id === targetId || !c.column) continue;
+    if (c.op !== "eq" && c.op !== "in") continue;
+    if (c.value.trim() === "") continue;
+    const values =
+      c.op === "in"
+        ? c.value.split(",").map((s) => s.trim()).filter(Boolean)
+        : [c.value.trim()];
+    if (values.length > 0) out.push({ column: c.column, values });
+  }
+  return out;
+}
+
+// Narrow a column's suggestions to values co-occurring (in the spec) with the
+// group's other eq/in constraints. Returns the full list (+ empty:true warning)
+// when the context matches no event. AND groups only.
+export function narrowedSuggestions(
+  events: SpecEvent[],
+  fullIndex: Record<string, string[]>,
+  column: string,
+  conditions: { id: string; column: string; op: string; value: string }[],
+  groupMatch: "and" | "or",
+  targetId: string
+): { values: string[]; empty: boolean } {
+  const full = fullIndex[column] ?? [];
+  // No spec loaded at all: nothing to narrow and no "conflicting filters" to
+  // warn about — behave like plain (empty) autocomplete, not an inconsistency.
+  if (events.length === 0) return { values: full, empty: false };
+  if (groupMatch !== "and") return { values: full, empty: false };
+  const constraints = contextConstraints(conditions, targetId);
+  if (constraints.length === 0) return { values: full, empty: false };
+  const survivors = events.filter((ev) =>
+    constraints.every((c) => {
+      const v = eventValueForColumn(ev, c.column);
+      return v !== undefined && c.values.includes(v);
+    })
+  );
+  if (survivors.length === 0) return { values: full, empty: true };
+  const set = new Set<string>();
+  for (const ev of survivors) {
+    const v = eventValueForColumn(ev, column);
+    if (v) set.add(v);
+  }
+  const values = Array.from(set).sort().slice(0, SUGGESTION_CAP);
+  return { values: values.length > 0 ? values : full, empty: false };
 }
 
 export function buildCustomPayload(state: CustomOptionsState): Record<string, unknown> {
@@ -322,7 +398,7 @@ function AggColumnOptions({ func }: { func: string }) {
   );
 }
 
-function ConditionRow({ cond, suggestions, onChange, onRemove }: { cond: Condition; suggestions?: string[]; onChange: (patch: Partial<Condition>) => void; onRemove: () => void }) {
+function ConditionRow({ cond, suggestions, suggestionsEmpty, onChange, onRemove }: { cond: Condition; suggestions?: string[]; suggestionsEmpty?: boolean; onChange: (patch: Partial<Condition>) => void; onRemove: () => void }) {
   const numErr = numericError(cond.op, cond.value);
   const listId = suggestions && suggestions.length > 0 ? `dl-${cond.id}` : undefined;
   return (
@@ -352,6 +428,9 @@ function ConditionRow({ cond, suggestions, onChange, onRemove }: { cond: Conditi
             </datalist>
           )}
           {numErr && <span className="qb-cond-err">{numErr}</span>}
+          {suggestionsEmpty && (
+            <span className="qb-cond-err">Nenhum evento da spec combina os filtros atuais.</span>
+          )}
         </>
       )}
       <button type="button" className="qb-cond-x" onClick={onRemove} aria-label="Remover condição">✕</button>
@@ -520,9 +599,10 @@ export function CustomOptions({ events, value, onChange }: CustomOptionsProps) {
                 <button type="button" className="qb-funnel-step-btn" onClick={() => removeFunnelStep(s.id)} disabled={value.funnelSteps.length <= 2} aria-label="Remover etapa">Remover ✕</button>
               </div>
               <AndOrToggle value={s.match} onChange={(m) => updateFunnelStep(s.id, { match: m })} />
-              {s.conditions.map((c) => (
-                <ConditionRow key={c.id} cond={c} suggestions={suggestionIndex[c.column]} onChange={(patch) => updateStepCondition(s.id, c.id, patch)} onRemove={() => removeStepCondition(s.id, c.id)} />
-              ))}
+              {s.conditions.map((c) => {
+                const sug = narrowedSuggestions(events, suggestionIndex, c.column, s.conditions, s.match, c.id);
+                return <ConditionRow key={c.id} cond={c} suggestions={sug.values} suggestionsEmpty={sug.empty} onChange={(patch) => updateStepCondition(s.id, c.id, patch)} onRemove={() => removeStepCondition(s.id, c.id)} />;
+              })}
               <div className="qb-cb-actions">
                 <button type="button" className="qb-add" onClick={() => addStepCondition(s.id)}>+ Adicionar condição</button>
               </div>
@@ -549,9 +629,10 @@ export function CustomOptions({ events, value, onChange }: CustomOptionsProps) {
                   <button type="button" className="qb-cond-x" onClick={() => removeGroup(gi)} aria-label="Remover grupo">Remover grupo ✕</button>
                 )}
               </div>
-              {g.conditions.map((c, ci) => (
-                <ConditionRow key={c.id} cond={c} suggestions={suggestionIndex[c.column]} onChange={(patch) => updateCondition(gi, ci, patch)} onRemove={() => removeCondition(gi, ci)} />
-              ))}
+              {g.conditions.map((c, ci) => {
+                const sug = narrowedSuggestions(events, suggestionIndex, c.column, g.conditions, g.match, c.id);
+                return <ConditionRow key={c.id} cond={c} suggestions={sug.values} suggestionsEmpty={sug.empty} onChange={(patch) => updateCondition(gi, ci, patch)} onRemove={() => removeCondition(gi, ci)} />;
+              })}
               <div className="qb-cb-actions">
                 <button type="button" className="qb-add" onClick={() => addCondition(gi)}>+ Adicionar condição</button>
                 {events.length > 0 && (
@@ -576,9 +657,10 @@ export function CustomOptions({ events, value, onChange }: CustomOptionsProps) {
           </div>
           {value.scopeEnabled && (
             <>
-              {value.scopeConditions.map((c, ci) => (
-                <ConditionRow key={c.id} cond={c} suggestions={suggestionIndex[c.column]} onChange={(patch) => updateScope(ci, patch)} onRemove={() => removeScope(ci)} />
-              ))}
+              {value.scopeConditions.map((c, ci) => {
+                const sug = narrowedSuggestions(events, suggestionIndex, c.column, value.scopeConditions, value.scopeMatch, c.id);
+                return <ConditionRow key={c.id} cond={c} suggestions={sug.values} suggestionsEmpty={sug.empty} onChange={(patch) => updateScope(ci, patch)} onRemove={() => removeScope(ci)} />;
+              })}
               <button type="button" className="qb-add" onClick={addScopeCondition}>+ Adicionar condição de sessão</button>
               <p className="qb-hint">Considera sessões cujo algum evento satisfaz isto (subquery sobre ga_session_id).</p>
             </>
