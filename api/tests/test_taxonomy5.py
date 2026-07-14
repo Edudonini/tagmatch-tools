@@ -74,7 +74,11 @@ def test_convert_error_detection_and_status():
     assert f["error_status"] == "bloqueado"
     assert out["fields"]["error_status"]["confidence"] == "auto"
     assert f["status_journey"] == "erro"
+    assert out["fields"]["status_journey"]["confidence"] == "auto"
     assert "error_type" in out["fields"]
+    # component_copy/event_detail seed from the message part, not the app&blocker& prefix
+    assert f["component_copy"] == "falha_diagnostico"
+    assert f["event_detail"] == "visualizacao_falha_diagnostico"
 
 
 def test_convert_error_nonblocker_continuar():
@@ -95,6 +99,13 @@ def test_convert_manual_fields_blank_and_flagged():
     for key in ("origin_nv", "client_category", "department"):
         assert out["fields"][key]["value"] == ""
         assert out["fields"][key]["confidence"] == "manual"
+
+
+def test_convert_unknown_event_name_is_review():
+    out = convert_events([_one(name="foo")])[0]
+    assert out["event_kind"] == "foo"
+    assert out["fields"]["event"]["value"] == "foo"
+    assert out["fields"]["event"]["confidence"] == "review"
 
 
 def test_convert_rejects_non_list():

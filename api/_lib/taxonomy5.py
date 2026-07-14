@@ -72,6 +72,8 @@ def _access_type_from_ct(ct):
 
 
 def _component_type_from_ac(ac):
+    # If ac mentions more than one component word, the first in COMPONENT_TYPE
+    # order wins (rare; the analyst can correct it — this is a "review" seed).
     a = str(ac or "").lower()
     for ctype in COMPONENT_TYPE:
         if ctype in a:
@@ -94,8 +96,16 @@ def _error_status_from_lb(lb):
     return ("bloqueado", "auto") if m.group(1).lower() == "blocker" else ("continuar", "auto")
 
 
+def _lb_text(lb):
+    """The human-facing part of lb. Error labels are `app&[blocker|nonBlocker]&message`;
+    return the message so component_copy/event_detail aren't seeded with the noisy prefix."""
+    s = str(lb or "")
+    m = re.search(r"&\s*(?:blocker|nonblocker)\s*&(.*)$", s, re.I)
+    return m.group(1) if m else s
+
+
 def _event_detail(acao, lb, ac):
-    desc = normalize(lb) or normalize(ac)
+    desc = normalize(_lb_text(lb)) or normalize(ac)
     return f"{acao}_{desc}" if desc else acao
 
 
@@ -123,12 +133,13 @@ def convert_event(ev):
     fields["macro_journey"] = _f(normalize(_journey_segment(sn)), "review")
     fields["micro_journey"] = _f(normalize(ev.get("screen_description")), "review")
     fields["event_detail"] = _f(_event_detail(acao, lb, ac), "review")
-    fields["status_journey"] = _f("erro" if has_error else "", "manual")
+    # status_journey is derived (auto) for error events, else left for the analyst.
+    fields["status_journey"] = _f("erro", "auto") if has_error else _f("", "manual")
 
     if kind in ("interaction", "noninteraction"):
         ctype = _component_type_from_ac(ac)
         fields["component_type"] = _f(ctype, "auto" if ctype else "manual")
-        fields["component_copy"] = _f(normalize(lb), "review")
+        fields["component_copy"] = _f(normalize(_lb_text(lb)), "review")
 
     if has_error:
         es_val, es_conf = _error_status_from_lb(lb)
