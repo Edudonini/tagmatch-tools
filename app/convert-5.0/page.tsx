@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { badgeClass, badgeLabel } from "../_lib/ResultsPanel";
 import { takeSpecHandoff } from "../_lib/specHandoff";
-import { CONTEXT_FIELDS, ENUMS, type ConvEvent } from "./taxonomy5";
+import { ConvertCard } from "./ConvertCard";
+import { CONTEXT_FIELDS, ENUMS, validate, toBlock, type ConvEvent } from "./taxonomy5";
 
 async function convert(rows: unknown[]): Promise<ConvEvent[]> {
   const res = await fetch("/api/convert-taxonomy", {
@@ -105,10 +106,25 @@ export default function ConvertTaxonomyPage() {
     setEvents(applyContext(events, journeyContext));
   }
 
+  function updateEvent(index: number, updated: ConvEvent) {
+    if (!events) return;
+    setEvents(events.map((ev, i) => (i === index ? updated : ev)));
+  }
+
+  function copyAll() {
+    if (!events) return;
+    navigator.clipboard.writeText(events.map((ev) => toBlock(ev)).join("\n\n"));
+  }
+
   const eventTypeCounts = (events ?? []).reduce<Record<string, number>>((acc, e) => {
     acc[e.event_kind] = (acc[e.event_kind] ?? 0) + 1;
     return acc;
   }, {});
+
+  const pendingCount = (events ?? []).reduce(
+    (acc, e) => acc + (Object.keys(validate(e)).length > 0 ? 1 : 0),
+    0
+  );
 
   return (
     <main className="shell">
@@ -200,23 +216,23 @@ export default function ConvertTaxonomyPage() {
             </div>
           </div>
 
-          {/* Placeholder — replaced by per-event review cards + copy output in the next task. */}
-          <div className="panel qb-options convert5-events">
-            <div className="qb-section-label">Eventos convertidos</div>
-            <ul className="convert5-list">
-              {events.map((ev, i) => (
-                <li className="convert5-list-item" key={`${String(ev.event_order ?? "?")}-${i}`}>
-                  <span className="mv-order">#{String(ev.event_order ?? "?")}</span>
-                  <span className={`badge ${badgeClass(ev.event_kind)}`}>
-                    <span className="dot" />
-                    {badgeLabel(ev.event_kind)} {ev.event_kind}
-                  </span>
-                  <span className="mono convert5-list-value">
-                    {ev.fields.screenName?.value || ev.fields.event_detail?.value || "—"}
-                  </span>
-                </li>
-              ))}
-            </ul>
+          <div className="convert5-copy-all">
+            <span className="convert5-summary">
+              {events.length} eventos · {pendingCount} com pendências
+            </span>
+            <button className="btn btn-primary" onClick={copyAll}>
+              Copiar tudo
+            </button>
+          </div>
+
+          <div className="convert5-cards">
+            {events.map((ev, i) => (
+              <ConvertCard
+                key={`${String(ev.event_order ?? "?")}-${i}`}
+                event={ev}
+                onChange={(updated) => updateEvent(i, updated)}
+              />
+            ))}
           </div>
         </>
       )}

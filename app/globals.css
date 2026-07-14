@@ -884,6 +884,130 @@ tbody tr:hover {
   font-size: 12.5px;
 }
 
+.convert5-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.convert5-card {
+  flex-direction: column;
+  gap: 14px;
+}
+
+.convert5-card-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.convert5-card-screen {
+  color: var(--text);
+  font-size: 13px;
+  word-break: break-all;
+}
+
+.convert5-field-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.convert5-field-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.convert5-field-label {
+  flex: 1;
+  min-width: 200px;
+}
+
+.convert5-field-label select.review-field-input {
+  cursor: pointer;
+}
+
+.convert5-confidence {
+  font-size: 11px;
+  font-family: var(--font-sans), sans-serif;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 12px;
+  white-space: nowrap;
+  flex: none;
+}
+
+.convert5-confidence-auto {
+  background: var(--nonint-soft);
+  color: var(--nonint);
+}
+
+.convert5-confidence-review {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+
+.convert5-confidence-manual {
+  background: var(--panel-raised);
+  color: var(--text-faint);
+}
+
+.convert5-flag {
+  font-size: 11px;
+  font-family: var(--font-sans), sans-serif;
+  color: var(--error);
+  white-space: nowrap;
+  flex: none;
+}
+
+.convert5-toggles {
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+
+.convert5-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.convert5-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 4px;
+  border-top: 1px solid var(--border);
+}
+
+.convert5-completion {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-family: var(--font-mono), ui-monospace, monospace;
+}
+
+.convert5-copy-all {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 20px;
+  flex-wrap: wrap;
+}
+
+.convert5-summary {
+  font-size: 12.5px;
+  color: var(--text-muted);
+  font-family: var(--font-mono), ui-monospace, monospace;
+}
+
 /* Matching */
 
 .row-clickable {
