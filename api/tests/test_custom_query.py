@@ -745,6 +745,23 @@ def test_aggregate_non_string_alias_rejected():
         _q(_aggq([{"func": "sum", "column": "value", "alias": 123}]))
 
 
+def test_aggregate_named_alias_collides_with_auto_deduped():
+    q = _q(_aggq([{"func": "sum", "column": "value"},
+                  {"func": "count", "column": None, "alias": "sum_value"}]))
+    assert "SUM(value) AS sum_value, COUNT(*) AS sum_value_2" in q
+
+
+def test_aggregate_two_percentiles_same_column_deduped():
+    q = _q(_aggq([{"func": "approx_percentile", "column": "value", "p": 0.5},
+                  {"func": "approx_percentile", "column": "value", "p": 0.9}]))
+    assert "approx_percentile(value, 0.5) AS approx_pct_value, approx_percentile(value, 0.9) AS approx_pct_value_2" in q
+
+
+def test_aggregate_approx_percentile_p_zero():
+    q = _q(_aggq([{"func": "approx_percentile", "column": "value", "p": 0}]))
+    assert "approx_percentile(value, 0)" in q
+
+
 def test_aggregate_having_or():
     q = _q(_aggq_hm([_metric("sum", "value")],
                     [{"func": "count", "column": None, "op": "gt", "value": "100"},

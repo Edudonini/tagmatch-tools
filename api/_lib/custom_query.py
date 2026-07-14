@@ -304,6 +304,8 @@ def _funnel_result(payload, table, start_date, end_date):
 def _validate_percentile(p):
     """Validate a percentile parameter as a number in [0,1]; return it as a literal string."""
     s = str(p).strip()
+    # _PCT_RE already constrains the value to [0,1]; the float range check is
+    # belt-and-suspenders in case the regex is ever loosened.
     if not _PCT_RE.match(s) or not (0.0 <= float(s) <= 1.0):
         raise ValueError(f"O percentil precisa ser um número entre 0 e 1, recebi '{p}'.")
     return s
