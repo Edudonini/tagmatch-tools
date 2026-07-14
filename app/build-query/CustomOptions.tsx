@@ -199,6 +199,9 @@ const SPEC_FIELD_TO_COLUMN: Record<string, string> = {
   lb: "eventLabel",
 };
 
+// Max distinct values offered per column in a datalist.
+const SUGGESTION_CAP = 50;
+
 // Build column -> distinct spec values (advisory autocomplete only; the server
 // still validates/escapes every value). Empty for columns with no spec values.
 function buildSuggestionIndex(events: SpecEvent[]): Record<string, string[]> {
@@ -222,7 +225,7 @@ function buildSuggestionIndex(events: SpecEvent[]): Record<string, string[]> {
   }
   const out: Record<string, string[]> = {};
   for (const [col, set] of Object.entries(acc)) {
-    out[col] = Array.from(set).sort().slice(0, 50);
+    out[col] = Array.from(set).sort().slice(0, SUGGESTION_CAP);
   }
   return out;
 }
@@ -274,6 +277,9 @@ export function narrowedSuggestions(
   targetId: string
 ): { values: string[]; empty: boolean } {
   const full = fullIndex[column] ?? [];
+  // No spec loaded at all: nothing to narrow and no "conflicting filters" to
+  // warn about — behave like plain (empty) autocomplete, not an inconsistency.
+  if (events.length === 0) return { values: full, empty: false };
   if (groupMatch !== "and") return { values: full, empty: false };
   const constraints = contextConstraints(conditions, targetId);
   if (constraints.length === 0) return { values: full, empty: false };
@@ -289,7 +295,7 @@ export function narrowedSuggestions(
     const v = eventValueForColumn(ev, column);
     if (v) set.add(v);
   }
-  const values = Array.from(set).sort().slice(0, 50);
+  const values = Array.from(set).sort().slice(0, SUGGESTION_CAP);
   return { values: values.length > 0 ? values : full, empty: false };
 }
 
