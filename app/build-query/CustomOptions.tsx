@@ -7,8 +7,8 @@ export type SpecEvent = Record<string, unknown>;
 export type Condition = { id: string; column: string; op: string; value: string };
 export type ConditionGroup = { id: string; match: "and" | "or"; conditions: Condition[] };
 export type FunnelStep = { id: string; label: string; match: "and" | "or"; conditions: Condition[] };
-export type AggMetric = { id: string; func: string; column: string };
-export type HavingCond = { id: string; func: string; column: string; op: string; value: string };
+export type AggMetric = { id: string; func: string; column: string; alias: string; p: string };
+export type HavingCond = { id: string; func: string; column: string; op: string; value: string; p: string };
 
 export type CustomOptionsState = {
   outputMode: "count_sessions" | "count_events" | "extract" | "aggregate" | "funnel";
@@ -22,8 +22,9 @@ export type CustomOptionsState = {
   limit: number;
   metrics: AggMetric[];
   having: HavingCond[];
+  havingMatch: "and" | "or";
   timeBucketEnabled: boolean;
-  timeBucketUnit: "day" | "week" | "month";
+  timeBucketUnit: "day" | "week" | "month" | "hour";
   funnelSteps: FunnelStep[];
 };
 
@@ -42,10 +43,10 @@ function newFunnelStep(): FunnelStep {
   return { id: newId(), label: "", match: "and", conditions: [newCondition()] };
 }
 function newMetric(): AggMetric {
-  return { id: newId(), func: "count", column: "" };
+  return { id: newId(), func: "count", column: "", alias: "", p: "" };
 }
 function newHaving(): HavingCond {
-  return { id: newId(), func: "count", column: "", op: "gt", value: "" };
+  return { id: newId(), func: "count", column: "", op: "gt", value: "", p: "" };
 }
 
 export const OPERATORS: { value: string; label: string; takesValue: boolean; numeric?: boolean }[] = [
@@ -88,16 +89,27 @@ export const AGG_FUNCTIONS: { value: string; label: string }[] = [
   { value: "max", label: "MAX" },
   { value: "approx_count_distinct", label: "DISTINCT (aprox.)" },
   { value: "stddev", label: "STDDEV" },
+  { value: "approx_percentile", label: "PERCENTIL (aprox.)" },
 ];
 // Functions that require a numeric column (mirrors _NUMERIC_AGG_FUNCS in custom_query.py).
-const NUMERIC_AGG_FUNCS = new Set(["sum", "avg", "min", "max", "stddev"]);
+const NUMERIC_AGG_FUNCS = new Set(["sum", "avg", "min", "max", "stddev", "approx_percentile"]);
 const HAVING_OPS: { value: string; label: string }[] = [
   { value: "gt", label: ">" }, { value: "lt", label: "<" }, { value: "gte", label: "≥" },
   { value: "lte", label: "≤" }, { value: "eq", label: "=" }, { value: "neq", label: "≠" },
 ];
 const TIME_BUCKET_UNITS: { value: string; label: string }[] = [
   { value: "day", label: "dia" }, { value: "week", label: "semana" }, { value: "month", label: "mês" },
+  { value: "hour", label: "hora" },
 ];
+
+// Mirrors _ALIAS_RE/_validate_percentile in the generator (api/_lib/custom_query.py).
+const ALIAS_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
+function validPercentile(p: string): boolean {
+  const s = p.trim();
+  if (s === "") return false;
+  const n = Number(s);
+  return Number.isFinite(n) && n >= 0 && n <= 1;
+}
 
 const DEFAULT_EXTRACT_COLUMNS = ["data", "event_timestamp", "event_name", "screenName", "ga_session_id"];
 
@@ -113,6 +125,7 @@ export const INITIAL_CUSTOM_STATE: CustomOptionsState = {
   limit: 1000,
   metrics: [newMetric()],
   having: [],
+  havingMatch: "and",
   timeBucketEnabled: false,
   timeBucketUnit: "day",
   funnelSteps: [newFunnelStep(), newFunnelStep()],
@@ -143,20 +156,25 @@ export function hasInvalidNumeric(state: CustomOptionsState): boolean {
   ];
   if (all.some((c) => numericError(c.op, c.value) !== null)) return true;
   if (state.outputMode === "aggregate") {
-    // Every numeric-requiring metric needs a numeric column; approx_count_distinct needs a column.
+    // Every numeric-requiring metric needs a numeric column; approx_count_distinct needs a column;
+    // approx_percentile needs a numeric column and a valid p; a filled alias must be a valid identifier.
     const metricInvalid = state.metrics.some(
       (m) =>
         (NUMERIC_AGG_FUNCS.has(m.func) && !NUMERIC_COLUMNS.includes(m.column)) ||
-        (m.func === "approx_count_distinct" && !m.column)
+        (m.func === "approx_count_distinct" && !m.column) ||
+        (m.func === "approx_percentile" && (!NUMERIC_COLUMNS.includes(m.column) || !validPercentile(m.p))) ||
+        (m.alias.trim() !== "" && !ALIAS_RE.test(m.alias.trim()))
     );
     if (state.metrics.length === 0 || metricInvalid) return true;
-    // Every filled HAVING row needs a numeric value and (for numeric funcs) a numeric column.
+    // Every filled HAVING row needs a numeric value and (for numeric funcs) a numeric column;
+    // approx_percentile also needs a valid p.
     const havingInvalid = state.having.some(
       (h) =>
         h.value.trim() !== "" &&
         (numericError("gt", h.value) !== null ||
           (NUMERIC_AGG_FUNCS.has(h.func) && !NUMERIC_COLUMNS.includes(h.column)) ||
-          (h.func === "approx_count_distinct" && !h.column))
+          (h.func === "approx_count_distinct" && !h.column) ||
+          (h.func === "approx_percentile" && (!NUMERIC_COLUMNS.includes(h.column) || !validPercentile(h.p))))
     );
     if (havingInvalid) return true;
   }
@@ -226,14 +244,28 @@ export function buildCustomPayload(state: CustomOptionsState): Record<string, un
     payload.limit = state.limit;
   } else if (state.outputMode === "aggregate") {
     const aggregate: Record<string, unknown> = {
-      metrics: state.metrics.map((m) => ({ func: m.func, column: m.column || null })),
+      metrics: state.metrics.map((m) => ({
+        func: m.func,
+        column: m.column || null,
+        ...(m.alias.trim() ? { alias: m.alias.trim() } : {}),
+        ...(m.func === "approx_percentile" && m.p.trim() ? { p: Number(m.p) } : {}),
+      })),
     };
     const having = state.having
       // Every HAVING row needs a numeric value; drop rows the user started but
       // left blank so an unfinished row does not 400 (the server rejects "").
       .filter((h) => h.value.trim() !== "")
-      .map((h) => ({ func: h.func, column: h.column || null, op: h.op, value: h.value }));
-    if (having.length > 0) aggregate.having = having;
+      .map((h) => ({
+        func: h.func,
+        column: h.column || null,
+        op: h.op,
+        value: h.value,
+        ...(h.func === "approx_percentile" && h.p.trim() ? { p: Number(h.p) } : {}),
+      }));
+    if (having.length > 0) {
+      aggregate.having = having;
+      aggregate.having_match = state.havingMatch;
+    }
     payload.aggregate = aggregate;
     payload.group_by = state.groupByDims;
     if (state.timeBucketEnabled) payload.time_bucket = { unit: state.timeBucketUnit };
@@ -441,6 +473,9 @@ export function CustomOptions({ events, value, onChange }: CustomOptionsProps) {
   function removeHaving(id: string) {
     onChange({ ...value, having: value.having.filter((h) => h.id !== id) });
   }
+  function setHavingMatch(match: "and" | "or") {
+    onChange({ ...value, havingMatch: match });
+  }
 
   const MODES: { key: CustomOptionsState["outputMode"]; label: string }[] = [
     { key: "count_sessions", label: "Contar sessões" },
@@ -591,6 +626,21 @@ export function CustomOptions({ events, value, onChange }: CustomOptionsProps) {
                 <select className="qb-cond-col" value={m.column} onChange={(e) => updateMetric(m.id, { column: e.target.value })}>
                   <AggColumnOptions func={m.func} />
                 </select>
+                <input
+                  className="qb-cond-val review-field-input"
+                  value={m.alias}
+                  placeholder="apelido (opcional)"
+                  onChange={(e) => updateMetric(m.id, { alias: e.target.value })}
+                />
+                {m.func === "approx_percentile" && (
+                  <input
+                    className={`qb-cond-val review-field-input${m.p.trim() !== "" && !validPercentile(m.p) ? " qb-cond-val--invalid" : ""}`}
+                    value={m.p}
+                    placeholder="p (0–1)"
+                    inputMode="decimal"
+                    onChange={(e) => updateMetric(m.id, { p: e.target.value })}
+                  />
+                )}
                 <button type="button" className="qb-cond-x" onClick={() => removeMetric(m.id)} disabled={value.metrics.length <= 1} aria-label="Remover métrica">✕</button>
               </div>
               {NUMERIC_AGG_FUNCS.has(m.func) && !NUMERIC_COLUMNS.includes(m.column) && (
@@ -598,6 +648,9 @@ export function CustomOptions({ events, value, onChange }: CustomOptionsProps) {
               )}
               {m.func === "approx_count_distinct" && !m.column && (
                 <p className="qb-hint">Escolha uma coluna.</p>
+              )}
+              {m.alias.trim() !== "" && !ALIAS_RE.test(m.alias.trim()) && (
+                <p className="qb-hint">Apelido inválido: use apenas letras, números e _ (começando com letra ou _).</p>
               )}
             </div>
           ))}
@@ -637,7 +690,10 @@ export function CustomOptions({ events, value, onChange }: CustomOptionsProps) {
 
       {value.outputMode === "aggregate" && (
         <div className="qb-cb-block">
-          <div className="qb-section-label">HAVING (FILTRAR GRUPOS)</div>
+          <div className="qb-cb-head">
+            <div className="qb-section-label">HAVING (FILTRAR GRUPOS)</div>
+            {value.having.length > 0 && <AndOrToggle value={value.havingMatch} onChange={setHavingMatch} />}
+          </div>
           {value.having.map((h) => {
             const numErr = numericError("gt", h.value);
             return (
@@ -657,6 +713,15 @@ export function CustomOptions({ events, value, onChange }: CustomOptionsProps) {
                   <select className="qb-cond-op" value={h.op} onChange={(e) => updateHaving(h.id, { op: e.target.value })}>
                     {HAVING_OPS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                   </select>
+                  {h.func === "approx_percentile" && (
+                    <input
+                      className={`qb-cond-val review-field-input${h.p.trim() !== "" && !validPercentile(h.p) ? " qb-cond-val--invalid" : ""}`}
+                      value={h.p}
+                      placeholder="p (0–1)"
+                      inputMode="decimal"
+                      onChange={(e) => updateHaving(h.id, { p: e.target.value })}
+                    />
+                  )}
                   <input
                     className={`qb-cond-val review-field-input${numErr ? " qb-cond-val--invalid" : ""}`}
                     value={h.value}
