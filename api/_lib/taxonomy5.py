@@ -82,7 +82,7 @@ def _component_type_from_ac(ac):
 
 
 def _detect_error(ac, lb):
-    if re.search(r"err", str(ac or ""), re.I):
+    if re.search(r"erro", str(ac or ""), re.I):  # matches "erro" and "error"
         return True
     if re.search(r"&\s*(blocker|nonblocker)\s*&", str(lb or ""), re.I):
         return True

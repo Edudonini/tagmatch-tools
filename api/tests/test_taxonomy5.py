@@ -1,3 +1,4 @@
+import importlib.util
 import os
 import sys
 
@@ -5,6 +6,14 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
 import pytest
 from api._lib.taxonomy5 import normalize, convert_events, derive_screen_name
+
+
+def _endpoint_client():
+    path = os.path.join(os.path.dirname(__file__), "..", "convert-taxonomy.py")
+    spec = importlib.util.spec_from_file_location("convert_taxonomy_ep", path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod.app.test_client()
 
 
 def test_normalize_snake_ascii():
@@ -111,6 +120,33 @@ def test_convert_unknown_event_name_is_review():
 def test_convert_rejects_non_list():
     with pytest.raises(ValueError):
         convert_events({"not": "a list"})
+
+
+# --- endpoint: 400-not-500 on malformed input ---
+
+def test_endpoint_valid_payload_200():
+    r = _endpoint_client().post("/api/convert-taxonomy",
+                                json={"events": [{"name": "screen_view", "sn": "/napp/fatura"}]})
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["ok"] is True and len(body["events"]) == 1
+
+
+def test_endpoint_events_not_list_is_400():
+    r = _endpoint_client().post("/api/convert-taxonomy", json={"events": "nope"})
+    assert r.status_code == 400
+    assert r.get_json()["ok"] is False
+
+
+def test_endpoint_array_body_is_400():
+    r = _endpoint_client().post("/api/convert-taxonomy", json=[1, 2, 3])
+    assert r.status_code == 400
+
+
+def test_endpoint_invalid_json_is_400():
+    r = _endpoint_client().post("/api/convert-taxonomy", data="not json",
+                                content_type="application/json")
+    assert r.status_code == 400
 
 
 def test_convert_events_empty_list_ok():
