@@ -102,13 +102,13 @@ const TIME_BUCKET_UNITS: { value: string; label: string }[] = [
   { value: "hour", label: "hora" },
 ];
 
-// Mirrors _ALIAS_RE/_validate_percentile in the generator (api/_lib/custom_query.py).
+// Mirrors _ALIAS_RE/_PCT_RE in the generator (api/_lib/custom_query.py).
 const ALIAS_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
+const PCT_RE = /^(0(\.\d+)?|1(\.0+)?|\.\d+)$/;
 function validPercentile(p: string): boolean {
-  const s = p.trim();
-  if (s === "") return false;
-  const n = Number(s);
-  return Number.isFinite(n) && n >= 0 && n <= 1;
+  // Mirror the server's decimal-only regex exactly (no exponential notation),
+  // so the value we send as a string round-trips to the same SQL literal.
+  return PCT_RE.test(p.trim());
 }
 
 const DEFAULT_EXTRACT_COLUMNS = ["data", "event_timestamp", "event_name", "screenName", "ga_session_id"];
@@ -248,7 +248,7 @@ export function buildCustomPayload(state: CustomOptionsState): Record<string, un
         func: m.func,
         column: m.column || null,
         ...(m.alias.trim() ? { alias: m.alias.trim() } : {}),
-        ...(m.func === "approx_percentile" && m.p.trim() ? { p: Number(m.p) } : {}),
+        ...(m.func === "approx_percentile" && m.p.trim() ? { p: m.p.trim() } : {}),
       })),
     };
     const having = state.having
@@ -260,7 +260,7 @@ export function buildCustomPayload(state: CustomOptionsState): Record<string, un
         column: h.column || null,
         op: h.op,
         value: h.value,
-        ...(h.func === "approx_percentile" && h.p.trim() ? { p: Number(h.p) } : {}),
+        ...(h.func === "approx_percentile" && h.p.trim() ? { p: h.p.trim() } : {}),
       }));
     if (having.length > 0) {
       aggregate.having = having;
@@ -627,7 +627,7 @@ export function CustomOptions({ events, value, onChange }: CustomOptionsProps) {
                   <AggColumnOptions func={m.func} />
                 </select>
                 <input
-                  className="qb-cond-val review-field-input"
+                  className={`qb-cond-val review-field-input${m.alias.trim() !== "" && !ALIAS_RE.test(m.alias.trim()) ? " qb-cond-val--invalid" : ""}`}
                   value={m.alias}
                   placeholder="apelido (opcional)"
                   onChange={(e) => updateMetric(m.id, { alias: e.target.value })}
