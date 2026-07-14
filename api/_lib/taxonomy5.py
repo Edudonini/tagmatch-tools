@@ -14,7 +14,9 @@ ORIGIN_NV = ("home", "menu", "push", "deeplink", "fluxo-interno")
 EVENT_ACCESS_TYPE = ("vivo", "b2c", "b2b_m", "b2b_c")
 CLIENT_CATEGORY = ("adm_prin", "adm", "tec", "cob", "soc", "b2c_not_apply", "vivo_not_apply")
 STATUS_JOURNEY = ("intencao", "sucesso", "erro", "progresso", "excecao")
-COMPONENT_TYPE = ("button", "link", "card", "modal", "toggle", "checkbox", "banner", "video", "dropdown")
+# Union of the /taxonomia page's list and the detailed guide's list, so no valid
+# value (incl. the page's `alert`/`input`) is ever unselectable.
+COMPONENT_TYPE = ("button", "card", "link", "alert", "banner", "input", "modal", "toggle", "checkbox", "video", "dropdown")
 ERROR_STATUS = ("bloqueado", "continuar")
 ERROR_TYPE = ("usuario", "negocio", "aplicativo")
 EVENT_PLAN_TYPE = ("pre", "pos", "controle", "fixa", "easy", "movel_corporativo", "fixo_corporativo")

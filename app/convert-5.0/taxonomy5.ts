@@ -14,7 +14,7 @@ export const ENUMS: Record<string, readonly string[]> = {
   event_access_type: ["vivo", "b2c", "b2b_m", "b2b_c"],
   client_category: ["adm_prin", "adm", "tec", "cob", "soc", "b2c_not_apply", "vivo_not_apply"],
   status_journey: ["intencao", "sucesso", "erro", "progresso", "excecao"],
-  component_type: ["button", "link", "card", "modal", "toggle", "checkbox", "banner", "video", "dropdown"],
+  component_type: ["button", "card", "link", "alert", "banner", "input", "modal", "toggle", "checkbox", "video", "dropdown"],
   error_status: ["bloqueado", "continuar"],
   error_type: ["usuario", "negocio", "aplicativo"],
   event_plan_type: ["pre", "pos", "controle", "fixa", "easy", "movel_corporativo", "fixo_corporativo"],
