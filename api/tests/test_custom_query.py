@@ -678,3 +678,118 @@ def test_funnel_rejects_non_dict_step():
             _fstep([{"column": "event_name", "op": "eq", "value": "a"}]),
             "not-a-dict",
         ]))
+
+
+def _aggq_hm(metrics, having, match, group_by=None):
+    payload = _aggq(metrics, group_by=group_by, having=having)
+    payload["aggregate"]["having_match"] = match
+    return payload
+
+
+def test_aggregate_approx_percentile():
+    q = _q(_aggq([{"func": "approx_percentile", "column": "value", "p": 0.5}]))
+    assert "approx_percentile(value, 0.5) AS approx_pct_value" in q
+
+
+def test_aggregate_approx_percentile_numeric_gate():
+    with pytest.raises(ValueError, match="numérica"):
+        _q(_aggq([{"func": "approx_percentile", "column": "screenName", "p": 0.5}]))
+
+
+def test_aggregate_approx_percentile_p_out_of_range():
+    with pytest.raises(ValueError, match="percentil"):
+        _q(_aggq([{"func": "approx_percentile", "column": "value", "p": 1.5}]))
+
+
+def test_aggregate_approx_percentile_p_non_numeric():
+    with pytest.raises(ValueError, match="percentil"):
+        _q(_aggq([{"func": "approx_percentile", "column": "value", "p": "abc"}]))
+
+
+def test_aggregate_approx_percentile_p_missing():
+    with pytest.raises(ValueError, match="percentil"):
+        _q(_aggq([{"func": "approx_percentile", "column": "value"}]))
+
+
+def test_aggregate_approx_percentile_boundary_p():
+    q1 = _q(_aggq([{"func": "approx_percentile", "column": "value", "p": ".95"}]))
+    assert "approx_percentile(value, .95)" in q1
+    q2 = _q(_aggq([{"func": "approx_percentile", "column": "value", "p": 1}]))
+    assert "approx_percentile(value, 1)" in q2
+
+
+def test_aggregate_named_alias():
+    q = _q(_aggq([{"func": "sum", "column": "value", "alias": "receita"}]))
+    assert "SUM(value) AS receita" in q
+
+
+def test_aggregate_named_alias_invalid_rejected():
+    for bad in ["a; DROP", "1abc", "a b"]:
+        with pytest.raises(ValueError, match="Alias inválido"):
+            _q(_aggq([{"func": "sum", "column": "value", "alias": bad}]))
+
+
+def test_aggregate_duplicate_named_alias_deduped():
+    q = _q(_aggq([{"func": "sum", "column": "value", "alias": "receita"},
+                  {"func": "avg", "column": "price", "alias": "receita"}]))
+    assert "SUM(value) AS receita, AVG(price) AS receita_2" in q
+
+
+def test_aggregate_empty_alias_falls_back_to_auto():
+    q = _q(_aggq([{"func": "sum", "column": "value", "alias": "   "}]))
+    assert "SUM(value) AS sum_value" in q
+
+
+def test_aggregate_non_string_alias_rejected():
+    with pytest.raises(ValueError, match="alias"):
+        _q(_aggq([{"func": "sum", "column": "value", "alias": 123}]))
+
+
+def test_aggregate_named_alias_collides_with_auto_deduped():
+    q = _q(_aggq([{"func": "sum", "column": "value"},
+                  {"func": "count", "column": None, "alias": "sum_value"}]))
+    assert "SUM(value) AS sum_value, COUNT(*) AS sum_value_2" in q
+
+
+def test_aggregate_two_percentiles_same_column_deduped():
+    q = _q(_aggq([{"func": "approx_percentile", "column": "value", "p": 0.5},
+                  {"func": "approx_percentile", "column": "value", "p": 0.9}]))
+    assert "approx_percentile(value, 0.5) AS approx_pct_value, approx_percentile(value, 0.9) AS approx_pct_value_2" in q
+
+
+def test_aggregate_approx_percentile_p_zero():
+    q = _q(_aggq([{"func": "approx_percentile", "column": "value", "p": 0}]))
+    assert "approx_percentile(value, 0)" in q
+
+
+def test_aggregate_having_or():
+    q = _q(_aggq_hm([_metric("sum", "value")],
+                    [{"func": "count", "column": None, "op": "gt", "value": "100"},
+                     {"func": "sum", "column": "value", "op": "gte", "value": "1000"}],
+                    "or", group_by=["screenName"]))
+    assert "HAVING COUNT(*) > 100 OR SUM(value) >= 1000" in q
+
+
+def test_aggregate_having_match_defaults_and():
+    q = _q(_aggq([_metric("count")], group_by=["screenName"],
+                 having=[{"func": "count", "column": None, "op": "gt", "value": "1"},
+                         {"func": "count", "column": None, "op": "lt", "value": "9"}]))
+    assert "HAVING COUNT(*) > 1 AND COUNT(*) < 9" in q
+
+
+def test_aggregate_having_match_invalid_rejected():
+    with pytest.raises(ValueError, match="having_match"):
+        _q(_aggq_hm([_metric("count")], [{"func": "count", "column": None, "op": "gt", "value": "1"}], "nand"))
+
+
+def test_aggregate_having_approx_percentile():
+    q = _q(_aggq([_metric("count")], group_by=["screenName"],
+                 having=[{"func": "approx_percentile", "column": "value", "p": 0.9, "op": "gt", "value": "50"}]))
+    assert "HAVING approx_percentile(value, 0.9) > 50" in q
+
+
+def test_aggregate_time_bucket_hour():
+    q = _q(_aggq([_metric("count")], time_bucket={"unit": "hour"}))
+    assert "SELECT date_trunc('HOUR', event_timestamp) AS periodo, COUNT(*) AS total" in q
+    assert "GROUP BY date_trunc('HOUR', event_timestamp)" in q
+    assert "ORDER BY periodo ASC" in q
