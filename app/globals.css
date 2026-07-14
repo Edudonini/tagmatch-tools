@@ -856,6 +856,34 @@ tbody tr:hover {
   white-space: pre;
 }
 
+/* Convert to 5.0 */
+
+.convert5-events {
+  margin-top: 20px;
+}
+
+.convert5-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.convert5-list-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel-raised);
+}
+
+.convert5-list-value {
+  color: var(--text-muted);
+  font-size: 12.5px;
+}
+
 /* Matching */
 
 .row-clickable {
