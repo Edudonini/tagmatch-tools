@@ -237,9 +237,13 @@ const COLUMN_TO_SPEC_FIELD: Record<string, string> = Object.fromEntries(
 );
 
 // The event's scalar value for a Silver column, or undefined if absent/empty/non-scalar.
+// Reads the same sources buildSuggestionIndex uses: the mapped short field
+// (sn/name/ct/ac/lb) and, as a fallback, a direct allow-listed key of the same
+// name — so a value that appears in the datalist is also visible to matching.
 export function eventValueForColumn(event: SpecEvent, column: string): string | undefined {
+  const rec = event as Record<string, unknown>;
   const field = COLUMN_TO_SPEC_FIELD[column] ?? column;
-  const raw = (event as Record<string, unknown>)[field];
+  const raw = rec[field] ?? (field !== column ? rec[column] : undefined);
   if (typeof raw !== "string" && typeof raw !== "number") return undefined;
   const v = String(raw).trim();
   return v || undefined;
