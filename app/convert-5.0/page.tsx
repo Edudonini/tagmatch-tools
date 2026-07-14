@@ -31,10 +31,9 @@ function applyContext(events: ConvEvent[], ctx: Record<string, string>): ConvEve
 type ContextField = (typeof CONTEXT_FIELDS)[number];
 type ContextState = Record<ContextField, string>;
 
-const EMPTY_CONTEXT: ContextState = CONTEXT_FIELDS.reduce((acc, key) => {
-  acc[key] = "";
-  return acc;
-}, {} as ContextState);
+const EMPTY_CONTEXT: ContextState = Object.fromEntries(
+  CONTEXT_FIELDS.map((k) => [k, ""])
+) as ContextState;
 
 const CONTEXT_LABELS: Record<ContextField, string> = {
   department: "Department",
@@ -51,11 +50,11 @@ export default function ConvertTaxonomyPage() {
   const [converting, setConverting] = useState(false);
   const [convertError, setConvertError] = useState<string | null>(null);
   const [fromHandoff, setFromHandoff] = useState(false);
-  const [handoffLoading, setHandoffLoading] = useState(false);
 
-  async function runConvert(rows: unknown[]) {
+  async function runConvert(rows: unknown[], viaHandoff = false) {
     setConverting(true);
     setConvertError(null);
+    setFromHandoff(viaHandoff);
     try {
       const converted = await convert(rows);
       setEvents(converted);
@@ -67,14 +66,13 @@ export default function ConvertTaxonomyPage() {
     }
   }
 
+  // Convert the handed-off spec once on mount. Setting the loading state on
+  // mount is intentional here (a fetch-on-mount), so the cascading-render
+  // warning is explicitly accepted rather than worked around.
   useEffect(() => {
     const rows = takeSpecHandoff();
-    if (!rows || rows.length === 0) return;
-    Promise.resolve()
-      .then(() => setHandoffLoading(true))
-      .then(() => runConvert(rows))
-      .then(() => setFromHandoff(true))
-      .finally(() => setHandoffLoading(false));
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (rows && rows.length > 0) runConvert(rows, true);
   }, []);
 
   async function handleFileChange(selected: File | null) {
@@ -134,10 +132,10 @@ export default function ConvertTaxonomyPage() {
           Choose events file
         </label>
         <span className="file-name">{file ? file.name : "No file chosen"}</span>
-        {converting && <span className="qb-parsing">Convertendo…</span>}
+        {converting && !fromHandoff && <span className="qb-parsing">Convertendo…</span>}
       </div>
 
-      {handoffLoading && (
+      {fromHandoff && converting && (
         <p className="handoff-loading">
           <span className="handoff-spinner" aria-hidden="true" />
           Carregando o mapa extraído…
