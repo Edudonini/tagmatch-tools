@@ -252,6 +252,27 @@ def test_build_query_custom_aggregate_empty_metrics_is_400_not_500():
     assert "métrica" in result["error"]
 
 
+def test_build_query_custom_aggregate_bad_alias_is_400_not_500():
+    result = build_query([], "custom", {
+        "start_date": "2026-01-01", "end_date": "2026-01-31",
+        "custom": {"output_mode": "aggregate",
+                   "aggregate": {"metrics": [{"func": "sum", "column": "value", "alias": "1; DROP"}]}},
+    })
+    assert result["ok"] is False
+    assert "Alias inválido" in result["error"]
+
+
+def test_build_query_custom_aggregate_hour_bucket_ok():
+    result = build_query([], "custom", {
+        "start_date": "2026-01-01", "end_date": "2026-01-31",
+        "custom": {"output_mode": "aggregate",
+                   "aggregate": {"metrics": [{"func": "count", "column": None}]},
+                   "time_bucket": {"unit": "hour"}},
+    })
+    assert result["ok"] is True
+    assert "date_trunc('HOUR', event_timestamp)" in result["query"]
+
+
 # --- table override + validation ---
 
 def test_table_name_override():

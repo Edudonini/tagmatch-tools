@@ -21,18 +21,19 @@ ALLOWED_COLUMNS = frozenset(DEFAULT_SCHEMA_CONFIG["column_mapping"].values()) | 
 
 OUTPUT_MODES = ("count_sessions", "count_events", "extract", "aggregate", "funnel")
 MATCH_MODES = ("and", "or")
-AGG_FUNCS = ("sum", "avg", "min", "max", "count", "approx_count_distinct", "stddev")
+AGG_FUNCS = ("sum", "avg", "min", "max", "count", "approx_count_distinct", "stddev", "approx_percentile")
 _AGG_SQL = {
     "sum": "SUM", "avg": "AVG", "min": "MIN", "max": "MAX", "count": "COUNT",
     "approx_count_distinct": "APPROX_COUNT_DISTINCT", "stddev": "STDDEV",
 }
 # Aggregate functions that require a numeric column (curated NUMERIC_COLUMNS).
 _NUMERIC_AGG_FUNCS = frozenset({"sum", "avg", "min", "max", "stddev"})
-TIME_BUCKET_UNITS = ("day", "week", "month")
+TIME_BUCKET_UNITS = ("day", "week", "month", "hour")
 _TIME_BUCKET_SQL = {
     "day": "CAST(data AS DATE)",
     "week": "trunc(CAST(data AS DATE), 'WEEK')",
     "month": "trunc(CAST(data AS DATE), 'MM')",
+    "hour": "date_trunc('HOUR', event_timestamp)",
 }
 _HAVING_SQL = {"gt": ">", "lt": "<", "gte": ">=", "lte": "<=", "eq": "=", "neq": "<>"}
 # Curated numeric subset of the allow-list; sum/avg/min/max require one of these.
@@ -44,6 +45,8 @@ MAX_LIMIT = 10000
 FUNNEL_MAX_STEPS = 10
 
 _NUMERIC_RE = re.compile(r"^-?\d+(\.\d+)?$")
+_ALIAS_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+_PCT_RE = re.compile(r"^(0(\.\d+)?|1(\.0+)?|\.\d+)$")
 
 _NO_VALUE_OPS = ("is_empty", "is_not_empty")
 _NUMERIC_OPS = ("gt", "lt", "gte", "lte")
@@ -298,8 +301,16 @@ def _funnel_result(payload, table, start_date, end_date):
     }
 
 
-def _agg_expr(func, column):
-    """Compile a validated aggregate SQL expression from func + column. Raises ValueError."""
+def _validate_percentile(p):
+    """Validate a percentile parameter as a number in [0,1]; return it as a literal string."""
+    s = str(p).strip()
+    if not _PCT_RE.match(s) or not (0.0 <= float(s) <= 1.0):
+        raise ValueError(f"O percentil precisa ser um número entre 0 e 1, recebi '{p}'.")
+    return s
+
+
+def _agg_expr(func, column, p=None):
+    """Compile a validated aggregate SQL expression from func + column (+ p). Raises ValueError."""
     if func not in AGG_FUNCS:
         raise ValueError(f"Invalid aggregate function: '{func}'. Must be one of {AGG_FUNCS}.")
     if func == "count":
@@ -308,6 +319,13 @@ def _agg_expr(func, column):
         if not isinstance(column, str) or not column:
             raise ValueError("A função 'approx_count_distinct' precisa de uma coluna.")
         return f"APPROX_COUNT_DISTINCT({_validate_column(column)})"
+    if func == "approx_percentile":
+        col = _validate_column(column) if isinstance(column, str) and column else None
+        if col is None or col not in NUMERIC_COLUMNS:
+            raise ValueError(
+                f"A função 'approx_percentile' precisa de uma coluna numérica {sorted(NUMERIC_COLUMNS)}, recebi '{column}'."
+            )
+        return f"approx_percentile({col}, {_validate_percentile(p)})"
     # sum / avg / min / max / stddev -> numeric column required
     if func in _NUMERIC_AGG_FUNCS:
         # allow-list first, so an unknown/injected column is rejected as such
@@ -327,6 +345,8 @@ def _agg_alias(func, column):
         return "total" if not column else f"count_{column}"
     if func == "approx_count_distinct":
         return f"approx_distinct_{column}"
+    if func == "approx_percentile":
+        return f"approx_pct_{column}"
     return f"{func}_{column}"
 
 
@@ -355,24 +375,35 @@ def _compile_metrics(metrics):
             raise ValueError("Cada métrica deve ser um objeto.")
         func = m.get("func")
         column = m.get("column")
-        exprs.append(_agg_expr(func, column))
-        raw_aliases.append(_agg_alias(func, column if isinstance(column, str) and column else None))
+        exprs.append(_agg_expr(func, column, m.get("p")))
+        user_alias = m.get("alias")
+        if isinstance(user_alias, str) and user_alias.strip():
+            alias = user_alias.strip()
+            if not _ALIAS_RE.match(alias):
+                raise ValueError(
+                    f"Alias inválido: '{alias}'. Use apenas letras, números e _ (começando com letra ou _)."
+                )
+            raw_aliases.append(alias)
+        else:
+            raw_aliases.append(_agg_alias(func, column if isinstance(column, str) and column else None))
     aliases = _dedupe_aliases(raw_aliases)
     select_terms = [f"{e} AS {a}" for e, a in zip(exprs, aliases)]
     return select_terms, aliases
 
 
-def _compile_having(having):
-    """Compile the optional HAVING list into ('<agg> <op> <num> AND ...', count)."""
+def _compile_having(having, match="and"):
+    """Compile the optional HAVING list into ('<agg> <op> <num> <AND|OR> ...', count)."""
     if having is None:
         return "", 0
     if not isinstance(having, list):
         raise ValueError("aggregate.having deve ser uma lista.")
+    if match not in MATCH_MODES:
+        raise ValueError(f"aggregate.having_match inválido: '{match}'. Deve ser 'and' ou 'or'.")
     parts = []
     for h in having:
         if not isinstance(h, dict):
             raise ValueError("Cada condição HAVING deve ser um objeto.")
-        expr = _agg_expr(h.get("func"), h.get("column"))
+        expr = _agg_expr(h.get("func"), h.get("column"), h.get("p"))
         op = h.get("op")
         if op not in _HAVING_SQL:
             raise ValueError(f"Operador HAVING inválido: '{op}'.")
@@ -380,7 +411,8 @@ def _compile_having(having):
         if not _NUMERIC_RE.match(val):
             raise ValueError(f"HAVING precisa de um valor numérico, recebi '{h.get('value')}'.")
         parts.append(f"{expr} {_HAVING_SQL[op]} {val}")
-    return " AND ".join(parts), len(parts)
+    joiner = " AND " if match == "and" else " OR "
+    return joiner.join(parts), len(parts)
 
 
 def _time_bucket_expr(spec):
@@ -456,7 +488,7 @@ def build_custom_query(payload, start_date, end_date=None, schema_config=None):
         if not isinstance(agg_spec, dict):
             raise ValueError("aggregate must be an object.")
         select_terms, aliases = _compile_metrics(agg_spec.get("metrics"))
-        having_clause, having_count = _compile_having(agg_spec.get("having"))
+        having_clause, having_count = _compile_having(agg_spec.get("having"), agg_spec.get("having_match", "and"))
         bucket_expr = _time_bucket_expr(payload.get("time_bucket"))
 
         select_dims = ([f"{bucket_expr} AS periodo"] if bucket_expr else []) + group_by
