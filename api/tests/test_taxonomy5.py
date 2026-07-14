@@ -31,6 +31,12 @@ def test_derive_screen_name_strips_napp_and_kebabs():
     assert derive_screen_name("/napp/suporte-tecnico", None, None) == "/suporte-tecnico/"
 
 
+def test_derive_screen_name_keeps_full_multi_segment_path():
+    # the whole old sn path is preserved (not just the first segment), napp/easy stripped
+    assert derive_screen_name("/napp/hub-payment/insert-card-data", "x", "") == "/hub-payment/insert-card-data"
+    assert derive_screen_name("/easy/hub-payment/insert-card-data", None, None) == "/hub-payment/insert-card-data"
+
+
 def _one(name="screen_view", sn="/napp/fatura", ct="b2c_ecare_napp_fatura", ac="", lb="",
          screen_name="Detalhe da Fatura", screen_description="Consulta da fatura", order=1):
     return {"name": name, "sn": sn, "ct": ct, "ac": ac, "lb": lb,
@@ -115,6 +121,35 @@ def test_convert_unknown_event_name_is_review():
     assert out["event_kind"] == "foo"
     assert out["fields"]["event"]["value"] == "foo"
     assert out["fields"]["event"]["confidence"] == "review"
+
+
+def test_convert_passthrough_old_values_and_plan():
+    ev = {
+        "name": "interaction", "sn": "/napp/hub-payment/insert-card-data",
+        "ct": "b2x_ecare_napp_hubPayment", "ac": "screen_click_button", "lb": "continuar_insertCardData",
+        "journeyVariant": "adicionarCartao", "crm_name": "siebel", "event_cnpj": "b2c_not_apply",
+        "origin_nv": "home", "client_category": "adm", "event_access_type": "vivo",
+        "payment_method": "pix", "info_detail": "tela_anterior",
+        "plan_name": "vivo_controle_12gb", "event_plan_type": "controle",
+    }
+    out = convert_events([ev])[0]
+    f = {k: v["value"] for k, v in out["fields"].items()}
+    assert f["screenName"] == "/hub-payment/insert-card-data"      # full path preserved
+    assert f["macro_journey"] == "adicionarcartao"                 # from journeyVariant
+    assert f["origin_nv"] == "home" and f["client_category"] == "adm" and f["event_access_type"] == "vivo"
+    assert out["fields"]["origin_nv"]["confidence"] == "review"    # carried, not blank/manual
+    assert f["component_type"] == "button"
+    assert f["crm_name"] == "siebel" and f["event_cnpj"] == "b2c_not_apply"
+    assert f["payment_method"] == "pix" and f["info_detail"] == "tela_anterior"
+    assert f["journeyVariant"] == "adicionarCartao"                # also carried through
+    assert out["has_product"] is True
+    assert f["plan_name"] == "vivo_controle_12gb" and f["event_plan_type"] == "controle"
+
+
+def test_convert_plan_placeholder_carried_from_old():
+    out = convert_events([{"name": "screen_view", "sn": "/napp/x", "plan_name": "[nomeDoPlano]"}])[0]
+    assert out["has_product"] is True
+    assert out["fields"]["plan_name"]["value"] == "[nomeDoPlano]"
 
 
 def test_convert_rejects_non_list():

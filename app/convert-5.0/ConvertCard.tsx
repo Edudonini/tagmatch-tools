@@ -1,7 +1,7 @@
 "use client";
 
 import { badgeClass, badgeLabel } from "../_lib/ResultsPanel";
-import { ENUMS, activeFields, normalize, toBlock, validate, withToggles, type ConvEvent, type ConvField } from "./taxonomy5";
+import { ENUMS, activeFields, isRawField, normalize, toBlock, validate, withToggles, type ConvEvent, type ConvField } from "./taxonomy5";
 
 type ConvertCardProps = {
   event: ConvEvent;
@@ -20,8 +20,9 @@ export function ConvertCard({ event, onChange }: ConvertCardProps) {
     onChange({ ...event, fields: { ...event.fields, [key]: { ...event.fields[key], value } } });
   }
   function normalizeField(key: string) {
-    if (key === "screenName" || key === "error_code") return;
+    if (isRawField(key)) return;
     const cur = event.fields[key]?.value ?? "";
+    if (/^\[.*\]$/.test(cur.trim())) return; // dynamic placeholder, e.g. [nome_do_plano]
     const n = normalize(cur);
     if (n !== cur) updateField(key, n);
   }

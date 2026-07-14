@@ -39,25 +39,42 @@ export function normalize(text: string): string {
 
 const SNAKE_RE = /^[a-z0-9_]+$/;
 const PATH_RE = /^\/[a-z0-9-]+(\/[a-z0-9-]+)*\/?$/;
+const PLACEHOLDER_RE = /^\[.*\]$/; // dynamic value filled in the metrics map, e.g. [nome_do_plano]
 
-// The ordered list of active field keys for an event given its toggles.
+const KNOWN_FIELDS: readonly string[] = [
+  ...BASE_FIELDS, ...COMPONENT_FIELDS, ...ERROR_FIELDS, ...PRODUCT_FIELDS,
+];
+
+// True for a field the analyst should not snake-normalize / enum-validate.
+export function isRawField(key: string): boolean {
+  return key === "screenName" || key === "error_code";
+}
+
+// The ordered list of active field keys: the known sets by toggle, then any
+// passthrough fields carried from the old event (crm_name, payment_method, …).
 export function activeFields(ev: ConvEvent): string[] {
   const keys: string[] = [...BASE_FIELDS];
   if (ev.event_kind === "interaction" || ev.event_kind === "noninteraction") keys.push(...COMPONENT_FIELDS);
   if (ev.has_error) keys.push(...ERROR_FIELDS);
   if (ev.has_product) keys.push(...PRODUCT_FIELDS);
+  const extras = Object.keys(ev.fields).filter((k) => !KNOWN_FIELDS.includes(k));
+  keys.push(...extras);
   return keys;
 }
 
 // Advisory validation: returns per-field issue strings for the active set.
+// Dynamic `[...]` placeholders and passthrough (non-known) fields are not flagged.
 export function validate(ev: ConvEvent): Record<string, string> {
   const issues: Record<string, string> = {};
   for (const key of activeFields(ev)) {
     const v = (ev.fields[key]?.value ?? "").trim();
-    if (v === "") { issues[key] = "obrigatório"; continue; }
+    if (PLACEHOLDER_RE.test(v)) continue; // filled dynamically in the metrics map
+    const known = KNOWN_FIELDS.includes(key);
+    if (v === "") { if (known) issues[key] = "obrigatório"; continue; }
     if (ENUMS[key] && !ENUMS[key].includes(v)) { issues[key] = "valor fora do enum"; continue; }
     if (key === "screenName") { if (!PATH_RE.test(v)) issues[key] = "caminho inválido"; continue; }
     if (key === "error_code") continue; // raw code
+    if (!known) continue; // passthrough field: carried as-is, not format-checked
     if (!ENUMS[key] && !SNAKE_RE.test(v)) issues[key] = "use snake_case sem acento";
   }
   return issues;

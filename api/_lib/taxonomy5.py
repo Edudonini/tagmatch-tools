@@ -46,19 +46,28 @@ def _kebab(text):
     return s.strip("-")
 
 
+_SN_PREFIXES = {"napp", "easy"}
+
+
+def _sn_segments(sn):
+    """The meaningful path segments of an old sn, minus the napp/easy prefix."""
+    return [p for p in str(sn or "").split("/") if p and p.lower() not in _SN_PREFIXES]
+
+
 def _journey_segment(sn):
-    segs = [p for p in str(sn or "").split("/") if p and p.lower() != "napp"]
+    segs = _sn_segments(sn)
     return segs[0] if segs else ""
 
 
 def derive_screen_name(sn, screen_name, screen_description):
-    """/{journey}/{tela}, kebab, no napp. tela seeded from the map's screen."""
-    journey = _kebab(_journey_segment(sn))
-    tela = _kebab(screen_name or screen_description or "")
-    if journey and tela:
-        return f"/{journey}/{tela}"
-    if journey:
-        return f"/{journey}/"
+    """Kebab path from the FULL old sn (all segments, no napp/easy). A single-segment
+    sn (just the journey) is completed with the map's screen as the tela."""
+    segs = [s for s in (_kebab(p) for p in _sn_segments(sn)) if s]
+    if len(segs) >= 2:
+        return "/" + "/".join(segs)
+    if len(segs) == 1:
+        tela = _kebab(screen_name or screen_description or "")
+        return f"/{segs[0]}/{tela}" if tela else f"/{segs[0]}/"
     return ""
 
 
@@ -115,6 +124,24 @@ def _f(value, confidence):
     return {"value": value, "confidence": confidence}
 
 
+# Legacy fields renamed/removed by the migration (never carried through as-is).
+_LEGACY = {"name", "sn", "ct", "ac", "lb"}
+# Map/derivation metadata — used to derive, never emitted as a 5.0 field.
+_META = {"screen_name", "screen_description", "event_order", "spec_id", "raw_lines",
+         "confidence_score", "trigger", "bbox", "svg_bbox"}
+
+
+def _carryable(key):
+    return (key not in _LEGACY and key not in _META
+            and not key.startswith("_") and not key.endswith("_regex"))
+
+
+def _old(ev, key):
+    """Trimmed string value of an old-event field, or '' if absent."""
+    v = ev.get(key)
+    return str(v).strip() if v is not None else ""
+
+
 def convert_event(ev):
     if not isinstance(ev, dict):
         ev = {}
@@ -125,35 +152,58 @@ def convert_event(ev):
     has_error = _detect_error(ac, lb)
 
     fields = {}
+    # --- base fields: derived, but the old event's own value wins when present ---
     fields["event"] = _f(name, "auto" if name in EVENT_KINDS else "review")
     fields["screenName"] = _f(derive_screen_name(sn, ev.get("screen_name"), ev.get("screen_description")), "review")
-    fields["origin_nv"] = _f("", "manual")
-    at_val, at_conf = _access_type_from_ct(ct)
-    fields["event_access_type"] = _f(at_val, at_conf)
-    fields["client_category"] = _f("", "manual")
-    fields["department"] = _f("", "manual")
-    fields["macro_journey"] = _f(normalize(_journey_segment(sn)), "review")
-    fields["micro_journey"] = _f(normalize(ev.get("screen_description")), "review")
-    fields["event_detail"] = _f(_event_detail(acao, lb, ac), "review")
-    # status_journey is derived (auto) for error events, else left for the analyst.
-    fields["status_journey"] = _f("erro", "auto") if has_error else _f("", "manual")
+    fields["origin_nv"] = _f(_old(ev, "origin_nv"), "review" if _old(ev, "origin_nv") else "manual")
+    if _old(ev, "event_access_type"):
+        fields["event_access_type"] = _f(_old(ev, "event_access_type"), "review")
+    else:
+        at_val, at_conf = _access_type_from_ct(ct)
+        fields["event_access_type"] = _f(at_val, at_conf)
+    fields["client_category"] = _f(_old(ev, "client_category"), "review" if _old(ev, "client_category") else "manual")
+    fields["department"] = _f(_old(ev, "department"), "review" if _old(ev, "department") else "manual")
+    jv = _old(ev, "journeyVariant")
+    fields["macro_journey"] = _f(normalize(jv) if jv else normalize(_journey_segment(sn)), "review")
+    fields["micro_journey"] = _f(_old(ev, "micro_journey") or normalize(ev.get("screen_description")), "review")
+    fields["event_detail"] = _f(_old(ev, "event_detail") or _event_detail(acao, lb, ac), "review")
+    if has_error:
+        fields["status_journey"] = _f("erro", "auto")
+    else:
+        fields["status_journey"] = _f(_old(ev, "status_journey"), "review" if _old(ev, "status_journey") else "manual")
 
     if kind in ("interaction", "noninteraction"):
-        ctype = _component_type_from_ac(ac)
-        fields["component_type"] = _f(ctype, "auto" if ctype else "manual")
-        fields["component_copy"] = _f(normalize(_lb_text(lb)), "review")
+        if _old(ev, "component_type"):
+            fields["component_type"] = _f(_old(ev, "component_type"), "review")
+        else:
+            ctype = _component_type_from_ac(ac)
+            fields["component_type"] = _f(ctype, "auto" if ctype else "manual")
+        fields["component_copy"] = _f(_old(ev, "component_copy") or normalize(_lb_text(lb)), "review")
 
     if has_error:
         es_val, es_conf = _error_status_from_lb(lb)
-        fields["error_status"] = _f(es_val, es_conf)
-        fields["error_type"] = _f("", "manual")
-        fields["error_code"] = _f("", "manual")
+        fields["error_status"] = _f(_old(ev, "error_status") or es_val,
+                                    "review" if _old(ev, "error_status") else es_conf)
+        fields["error_type"] = _f(_old(ev, "error_type"), "review" if _old(ev, "error_type") else "manual")
+        fields["error_code"] = _f(_old(ev, "error_code"), "review" if _old(ev, "error_code") else "manual")
+
+    # --- product disambiguation: present when the old event carries a plan field;
+    # carry the old value, else a dynamic placeholder filled in the metrics map ---
+    has_product = bool(_old(ev, "plan_name") or _old(ev, "event_plan_type"))
+    if has_product:
+        fields["plan_name"] = _f(_old(ev, "plan_name") or "[nome_do_plano]", "review")
+        fields["event_plan_type"] = _f(_old(ev, "event_plan_type") or "[tipo_do_plano]", "review")
+
+    # --- passthrough: any other old field not already mapped is carried through ---
+    for k, v in ev.items():
+        if _carryable(k) and k not in fields:
+            fields[k] = _f(str(v).strip() if v is not None else "", "review")
 
     return {
         "event_kind": kind,
         "event_order": ev.get("event_order"),
         "has_error": has_error,
-        "has_product": False,
+        "has_product": has_product,
         "fields": fields,
     }
 
