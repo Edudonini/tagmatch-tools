@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ResultsPanel, type ResultRow } from "../_lib/ResultsPanel";
 import { MatchDetailDrawer, type MatchRow } from "./MatchDetailDrawer";
-import { takeSpecHandoff, rowsToSpecFile } from "../_lib/specHandoff";
+import { loadSession, logsToFile, rowsToSpecFile } from "../_lib/sessionStore";
 
 type MatchResult =
   | {
@@ -32,14 +32,29 @@ export default function MatchPage() {
   const [drawerRow, setDrawerRow] = useState<MatchRow | null>(null);
   const [fromHandoff, setFromHandoff] = useState(false);
   const [handoffCount, setHandoffCount] = useState(0);
+  const [sessionFileName, setSessionFileName] = useState<string | null>(null);
+  const [logsFromSessionCount, setLogsFromSessionCount] = useState(0);
+  const specTouched = useRef(false);
+  const logsTouched = useRef(false);
 
   useEffect(() => {
-    const rows = takeSpecHandoff();
-    if (rows && rows.length > 0) {
-      setSpecFile(rowsToSpecFile(rows));
-      setHandoffCount(rows.length);
-      setFromHandoff(true);
-    }
+    let cancelled = false;
+    void loadSession().then(({ map, logs }) => {
+      if (cancelled) return;
+      if (!specTouched.current && map && map.spec.length > 0) {
+        setSpecFile(rowsToSpecFile(map.spec));
+        setHandoffCount(map.spec.length);
+        setSessionFileName(map.fileName);
+        setFromHandoff(true);
+      }
+      if (!logsTouched.current && logs && logs.logs.length > 0) {
+        setLogsFile(logsToFile(logs.logs));
+        setLogsFromSessionCount(logs.logs.length);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   async function handleMatch() {
@@ -88,6 +103,7 @@ export default function MatchPage() {
             type="file"
             accept=".json,.csv"
             onChange={(e) => {
+              specTouched.current = true;
               setSpecFile(e.target.files?.[0] ?? null);
               setFromHandoff(false);
             }}
@@ -96,7 +112,15 @@ export default function MatchPage() {
         </label>
         <span className="file-name">{specFile ? specFile.name : "No spec chosen"}</span>
         <label className="file-input-label">
-          <input type="file" accept=".json,.csv" onChange={(e) => setLogsFile(e.target.files?.[0] ?? null)} />
+          <input
+            type="file"
+            accept=".json,.csv"
+            onChange={(e) => {
+              logsTouched.current = true;
+              setLogsFile(e.target.files?.[0] ?? null);
+              setLogsFromSessionCount(0);
+            }}
+          />
           Choose logs
         </label>
         <span className="file-name">{logsFile ? logsFile.name : "No logs chosen"}</span>
@@ -106,7 +130,12 @@ export default function MatchPage() {
       </div>
 
       {fromHandoff && specFile && (
-        <p className="handoff-banner">Spec carregado da Extração de Mapa · {handoffCount} eventos.</p>
+        <p className="handoff-banner">
+          Spec do mapa da sessão{sessionFileName ? ` · ${sessionFileName}` : ""} · {handoffCount} eventos.
+        </p>
+      )}
+      {logsFromSessionCount > 0 && logsFile && (
+        <p className="handoff-banner">Logs da sessão · {logsFromSessionCount} eventos.</p>
       )}
 
       {result && !result.ok && <p className="alert-error">Couldn&apos;t run matching: {result.error}</p>}
