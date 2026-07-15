@@ -1,4 +1,4 @@
 flask>=3.0.0
 pandas>=2.2.0
 numpy>=1.26.0
-tagmatch @ git+https://github.com/Edudonini/TagMatch.git@4115b98e9c4c96d1150c39afa901d31ef955bc93
+tagmatch @ git+https://github.com/Edudonini/TagMatch.git@7751be461ad268551e54c3f66ede9e00f0b701a8
