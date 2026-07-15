@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { badgeClass, badgeLabel } from "../../_lib/ResultsPanel";
-import { storeSpecHandoff } from "../../_lib/specHandoff";
 
 export type MapRow = Record<string, unknown>;
 
@@ -140,7 +139,7 @@ export function MapView({ rows, report, onReview }: MapViewProps) {
   }
 
   function handoff(dest: "/build-query" | "/match" | "/convert-5.0") {
-    storeSpecHandoff(rows);
+    // The session store already holds the spec; the destination page reads it on mount.
     router.push(dest);
   }
 
