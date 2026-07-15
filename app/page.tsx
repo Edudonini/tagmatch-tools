@@ -3,37 +3,37 @@ import Link from "next/link";
 const TOOLS = [
   {
     href: "/extract-map",
-    glyph: "EX",
-    name: "Map Extraction",
-    desc: "Parse a Whimsical SVG export into a structured TagMatch event spec.",
+    glyph: "MA",
+    name: "Extração de Mapa",
+    desc: "Transforma um export SVG do Whimsical num spec de eventos estruturado.",
+    available: true,
+  },
+  {
+    href: "/extract-logs",
+    glyph: "LG",
+    name: "Extração de Logs",
+    desc: "Interpreta e mescla logs (Logcat, NDJSON, Dev JSON, Firebase) numa tabela única de eventos.",
     available: true,
   },
   {
     href: "/build-query",
     glyph: "QB",
     name: "Query Builder",
-    desc: "Generate Databricks SQL (validation, volumetry, funnel, custom) from a spec.",
+    desc: "Gera SQL do Databricks (validation, volumetry, funnel, custom) a partir de um spec.",
     available: true,
   },
   {
     href: "/match",
     glyph: "MT",
     name: "Matching",
-    desc: "Compare an extracted spec against extracted logs — coverage, confidence, divergences.",
-    available: true,
-  },
-  {
-    href: "/extract-logs",
-    glyph: "LX",
-    name: "Log Extraction",
-    desc: "Parse and merge Logcat/NDJSON/Dev JSON/Firebase logs into one events table.",
+    desc: "Compara um spec extraído com os logs — coverage, confiança e divergências.",
     available: true,
   },
   {
     href: "/convert-5.0",
     glyph: "5.0",
     name: "Converter para 5.0",
-    desc: "Convert an extracted App 4 map to the App 5.0 taxonomy, with journey-context assist.",
+    desc: "Converte um mapa App 4 para a taxonomia App 5.0, com apoio de contexto de jornada.",
     available: true,
   },
 ];
@@ -44,8 +44,8 @@ export default function Home() {
       <div className="eyebrow">tagmatch / tools</div>
       <h1>TagMatch Tools</h1>
       <p className="lede">
-        Standalone utilities for TagMatch spec extraction and QA — no login,
-        no run history. Upload, process, download.
+        Utilitários standalone para extração e QA de specs — sem login, sem
+        histórico. Suba o arquivo, processe, baixe o resultado.
       </p>
 
       <div className="tool-list">
