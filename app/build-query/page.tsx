@@ -1,9 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { badgeClass, badgeLabel } from "../_lib/ResultsPanel";
-import { loadSession, rowsToSpecFile } from "../_lib/sessionStore";
+import {
+  getServerSnapshot,
+  getSnapshot,
+  loadSession,
+  rowsToSpecFile,
+  subscribe,
+} from "../_lib/sessionStore";
 import {
   CustomOptions,
   INITIAL_CUSTOM_STATE,
@@ -41,6 +47,7 @@ export default function BuildQueryPage() {
   const [handoffLoading, setHandoffLoading] = useState(false);
   const [sessionFileName, setSessionFileName] = useState<string | null>(null);
   const skipHydration = useRef(false);
+  const meta = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
   const [queryType, setQueryType] = useState<string>("validation");
   const [startDate, setStartDate] = useState(() => isoDaysAgo(7));
@@ -118,6 +125,20 @@ export default function BuildQueryPage() {
       cancelled = true;
     };
   }, []);
+
+  // Drop session-derived state when the session map is cleared (✕ in the bar).
+  // Syncing from the external session store is intentional; the guard makes it idempotent.
+  useEffect(() => {
+    if (!meta.map && fromHandoff) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setFromHandoff(false);
+      setSessionFileName(null);
+      setFile(null);
+      setEvents(null);
+      setResult(null);
+      setScreenOrder([]);
+    }
+  }, [meta.map, fromHandoff]);
 
   function moveScreen(index: number, delta: number) {
     const target = index + delta;

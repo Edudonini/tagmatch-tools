@@ -1,9 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { badgeClass, badgeLabel } from "../_lib/ResultsPanel";
-import { loadSession } from "../_lib/sessionStore";
+import {
+  getServerSnapshot,
+  getSnapshot,
+  loadSession,
+  subscribe,
+} from "../_lib/sessionStore";
 import { ConvertCard } from "./ConvertCard";
 import { CONTEXT_FIELDS, ENUMS, validate, toBlock, withProductDisambiguation, type ConvEvent } from "./taxonomy5";
 
@@ -55,6 +60,7 @@ export default function ConvertTaxonomyPage() {
   const [fromHandoff, setFromHandoff] = useState(false);
   const [sessionFileName, setSessionFileName] = useState<string | null>(null);
   const skipHydration = useRef(false);
+  const meta = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
   async function runConvert(rows: unknown[], viaHandoff = false) {
     setConverting(true);
@@ -85,6 +91,17 @@ export default function ConvertTaxonomyPage() {
       cancelled = true;
     };
   }, []);
+
+  // Drop session-derived state when the session map is cleared (✕ in the bar).
+  // Syncing from the external session store is intentional; the guard makes it idempotent.
+  useEffect(() => {
+    if (!meta.map && fromHandoff) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setFromHandoff(false);
+      setSessionFileName(null);
+      setEvents(null);
+    }
+  }, [meta.map, fromHandoff]);
 
   async function handleFileChange(selected: File | null) {
     skipHydration.current = true;

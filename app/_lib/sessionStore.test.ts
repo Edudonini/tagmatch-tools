@@ -207,6 +207,60 @@ describe("sessionStore", () => {
     expect(store.getSnapshot().map?.eventCount).toBe(2);
   });
 
+  it("touches own records' envelope timestamps on hydrate, so a long-lived tab isn't GC'd by a sibling tab", async () => {
+    const store = await freshStore();
+    // Establish the current session id.
+    await store.loadSession();
+    const id = sessionStorage.getItem("tagmatch:session-id")!;
+    const oldT = Date.now() - 23 * 60 * 60 * 1000;
+
+    // Plant a map for the CURRENT session id directly via raw IndexedDB with
+    // an old-but-not-stale envelope, in the same {t, v} format the store writes.
+    await new Promise<void>((resolve, reject) => {
+      const req = indexedDB.open("tagmatch-tools", 1);
+      req.onupgradeneeded = () => {
+        req.result.createObjectStore("session");
+      };
+      req.onsuccess = () => {
+        const tx = req.result.transaction("session", "readwrite");
+        const objStore = tx.objectStore("session");
+        objStore.put(
+          { t: oldT, v: { fileName: MAP.fileName, spec: MAP.spec, report: MAP.report } },
+          `${id}:map`
+        );
+        objStore.put({ t: oldT, v: MAP.svgText }, `${id}:svg`);
+        tx.oncomplete = () => {
+          req.result.close();
+          resolve();
+        };
+        tx.onerror = () => reject(tx.error);
+      };
+      req.onerror = () => reject(req.error);
+    });
+
+    // Load a fresh module instance and hydrate.
+    const store2 = await freshStore();
+    await store2.loadSession();
+
+    // Read the raw record back and assert its timestamp was refreshed.
+    const record = await new Promise<{ t: number; v: unknown }>((resolve, reject) => {
+      const req = indexedDB.open("tagmatch-tools", 1);
+      req.onsuccess = () => {
+        const get = req.result.transaction("session").objectStore("session").get(`${id}:map`);
+        get.onsuccess = () => {
+          req.result.close();
+          resolve(get.result);
+        };
+        get.onerror = () => reject(get.error);
+      };
+      req.onerror = () => reject(req.error);
+    });
+    expect(Date.now() - record.t).toBeLessThan(60_000);
+
+    const store3 = await freshStore();
+    expect((await store3.loadSession()).map).toEqual(MAP);
+  });
+
   it("rowsToSpecFile / logsToFile wrap rows as JSON files", async () => {
     const store = await freshStore();
     const spec = store.rowsToSpecFile(MAP.spec);

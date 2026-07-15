@@ -191,6 +191,10 @@ async function hydrate(): Promise<void> {
   const id = sessionId();
   try {
     await idbGcOrphans(id);
+  } catch {
+    /* best-effort GC; never blocks hydration */
+  }
+  try {
     const [mapRec, svgText, logsRec] = await Promise.all([
       idbGet(`${id}:map`),
       idbGet(`${id}:svg`),
@@ -206,6 +210,17 @@ async function hydrate(): Promise<void> {
     idbAvailable = false;
   }
   refreshMeta();
+  // Touch own records so a long-lived tab isn't GC'd as stale by a sibling tab.
+  await persist(async () => {
+    if (cache.map) {
+      const { svgText, fileName, spec, report } = cache.map;
+      await idbPut(`${id}:svg`, svgText);
+      await idbPut(`${id}:map`, { fileName, spec, report });
+    }
+    if (cache.logs) {
+      await idbPut(`${id}:logs`, cache.logs);
+    }
+  });
 }
 
 export function loadSession(): Promise<{

@@ -1,10 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { ResultsPanel, type ResultRow } from "../_lib/ResultsPanel";
 import { MatchDetailDrawer, type MatchRow } from "./MatchDetailDrawer";
-import { loadSession, logsToFile, rowsToSpecFile } from "../_lib/sessionStore";
+import {
+  getServerSnapshot,
+  getSnapshot,
+  loadSession,
+  logsToFile,
+  rowsToSpecFile,
+  subscribe,
+} from "../_lib/sessionStore";
 
 type MatchResult =
   | {
@@ -36,6 +43,7 @@ export default function MatchPage() {
   const [logsFromSessionCount, setLogsFromSessionCount] = useState(0);
   const specTouched = useRef(false);
   const logsTouched = useRef(false);
+  const meta = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
   useEffect(() => {
     let cancelled = false;
@@ -56,6 +64,26 @@ export default function MatchPage() {
       cancelled = true;
     };
   }, []);
+
+  // Drop session-derived state when the session map is cleared (✕ in the bar).
+  // Syncing from the external session store is intentional; the guard makes it idempotent.
+  useEffect(() => {
+    if (!meta.map && fromHandoff) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setSpecFile(null);
+      setFromHandoff(false);
+      setHandoffCount(0);
+      setSessionFileName(null);
+    }
+  }, [meta.map, fromHandoff]);
+
+  useEffect(() => {
+    if (!meta.logs && logsFromSessionCount > 0) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setLogsFile(null);
+      setLogsFromSessionCount(0);
+    }
+  }, [meta.logs, logsFromSessionCount]);
 
   async function handleMatch() {
     if (!specFile || !logsFile) return;
