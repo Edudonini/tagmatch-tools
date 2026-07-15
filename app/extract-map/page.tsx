@@ -1,10 +1,10 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { ReviewMode } from "./review/ReviewMode";
 import { MapView } from "./mapview/MapView";
 import { clearSvgCropCache } from "./review/useSvgCropUrl";
+import { Dropzone } from "../_lib/Dropzone";
 import {
   getServerSnapshot,
   getSnapshot,
@@ -102,54 +102,56 @@ export default function ExtractMapPage() {
 
   return (
     <main className="shell">
-      <Link href="/" className="back-link">
-        ← All tools
-      </Link>
-      <div className="eyebrow">tagmatch / tools / extract-map</div>
-      <h1>Map Extraction</h1>
-      <p className="lede">
-        Upload a Whimsical SVG export. It comes back as a structured event
-        spec — same fields TagMatch uses to match logs.
-      </p>
+      <div className="narrow">
+        <div className="eyebrow">tagmatch / tools / extract-map</div>
+        <h1>Extração de Mapa</h1>
+        <p className="lede">
+          Suba um export SVG do Whimsical. Ele volta como um spec de eventos
+          estruturado — os mesmos campos que o TagMatch usa para casar os logs.
+        </p>
 
-      <form onSubmit={handleSubmit} className="panel control-panel">
-        <label className="file-input-label">
-          <input
-            type="file"
+        <form onSubmit={handleSubmit} className="panel control-panel">
+          <Dropzone
             accept=".svg"
-            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+            onFiles={(files) => setFile(files[0] ?? null)}
+            selectedLabel={file ? file.name : fileName}
+            idle="Arraste o SVG exportado do Whimsical, ou clique para escolher"
+            hint=".svg · exportado do board"
           />
-          Choose file
-        </label>
-        <span className="file-name">{file ? file.name : (fileName ?? "No file chosen")}</span>
-        <select value={mode} onChange={(e) => setMode(e.target.value)} aria-label="Extraction mode">
-          <option value="card">card (default)</option>
-          <option value="header">header</option>
-          <option value="hybrid">hybrid</option>
-        </select>
-        <button type="submit" className="btn btn-primary" disabled={!file || loading}>
-          {loading ? "Extracting…" : "Extract →"}
-        </button>
-      </form>
+          <div className="control-row">
+            <select value={mode} onChange={(e) => setMode(e.target.value)} aria-label="Modo de extração">
+              <option value="card">card (padrão)</option>
+              <option value="header">header</option>
+              <option value="hybrid">hybrid</option>
+            </select>
+            <button type="submit" className="btn btn-primary" disabled={!file || loading}>
+              {loading ? "Extraindo…" : "Extrair →"}
+            </button>
+          </div>
+          {loading && <p className="control-note">SVGs grandes podem levar alguns segundos.</p>}
+        </form>
 
-      {result && !result.ok && (
-        <p className="alert-error">Couldn&apos;t extract a spec: {result.error}</p>
-      )}
+        {result && !result.ok && (
+          <p className="alert-error">Não consegui extrair o spec: {result.error}</p>
+        )}
+      </div>
 
       {result && result.ok && view === "map" && (
         <MapView rows={result.spec} report={result.report} onReview={() => setView("review")} />
       )}
 
       {result && result.ok && view === "review" && (
-        <ReviewMode
-          rows={result.spec}
-          svgContent={svgContent}
-          onChange={(newRows) => {
-            setResult((prev) => (prev && prev.ok ? { ...prev, spec: newRows } : prev));
-            void updateMapSpec(newRows);
-          }}
-          onExit={() => setView("map")}
-        />
+        <div className="narrow">
+          <ReviewMode
+            rows={result.spec}
+            svgContent={svgContent}
+            onChange={(newRows) => {
+              setResult((prev) => (prev && prev.ok ? { ...prev, spec: newRows } : prev));
+              void updateMapSpec(newRows);
+            }}
+            onExit={() => setView("map")}
+          />
+        </div>
       )}
     </main>
   );

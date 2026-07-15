@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useSyncExternalStore } from "react";
-import { nextStepsFor } from "./nextSteps";
+import { nextStepsFor } from "./nextStepsResolver";
 import { getServerSnapshot, getSnapshot, subscribe } from "./sessionStore";
 
 export function NextSteps({ tool }: { tool: "extract-map" | "extract-logs" }) {

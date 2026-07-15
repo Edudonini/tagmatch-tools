@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { badgeClass, badgeLabel } from "../../_lib/ResultsPanel";
+import { NextSteps } from "../../_lib/NextSteps";
 
 export type MapRow = Record<string, unknown>;
 
@@ -118,7 +118,6 @@ function downloadRows(rows: MapRow[], format: "json" | "csv", baseName: string) 
 }
 
 export function MapView({ rows, report, onReview }: MapViewProps) {
-  const router = useRouter();
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   const groups = buildGroups(rows);
@@ -138,35 +137,21 @@ export function MapView({ rows, report, onReview }: MapViewProps) {
     });
   }
 
-  function handoff(dest: "/build-query" | "/match" | "/convert-5.0") {
-    // The session store already holds the spec; the destination page reads it on mount.
-    router.push(dest);
-  }
-
   return (
     <div className="mapview">
       <div className="mv-toolbar">
         {hasRows && (
           <>
             <button className="btn btn-ghost" onClick={() => downloadRows(rows, "json", "spec")}>
-              Download JSON
+              Baixar JSON
             </button>
             <button className="btn btn-ghost" onClick={() => downloadRows(rows, "csv", "spec")}>
-              Download CSV
+              Baixar CSV
             </button>
           </>
         )}
         <button className="btn btn-ghost" onClick={onReview}>
-          Review events →
-        </button>
-        <button className="btn btn-primary" onClick={() => handoff("/build-query")}>
-          Seguir para Query Builder →
-        </button>
-        <button className="btn btn-primary" onClick={() => handoff("/match")}>
-          Seguir para Matching →
-        </button>
-        <button className="btn btn-primary" onClick={() => handoff("/convert-5.0")}>
-          Converter para 5.0 →
+          Revisar eventos →
         </button>
       </div>
 
@@ -191,7 +176,7 @@ export function MapView({ rows, report, onReview }: MapViewProps) {
         </details>
       )}
 
-      {!hasRows && <p className="mv-empty">No events to display.</p>}
+      {!hasRows && <p className="mv-empty">Nenhum evento para exibir.</p>}
 
       {groups.map((g) => (
         <section className="mv-group" key={g.sn || "__none__"}>
@@ -249,6 +234,8 @@ export function MapView({ rows, report, onReview }: MapViewProps) {
           </div>
         </section>
       ))}
+
+      {hasRows && <NextSteps tool="extract-map" />}
     </div>
   );
 }

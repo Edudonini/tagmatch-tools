@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { nextStepsFor } from "./nextSteps";
+import { nextStepsFor } from "./nextStepsResolver";
 
 describe("nextStepsFor", () => {
   it("offers query, matching, and convert after a map extraction", () => {
