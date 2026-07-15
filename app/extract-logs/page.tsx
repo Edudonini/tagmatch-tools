@@ -1,8 +1,9 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { ResultsPanel } from "../_lib/ResultsPanel";
+import { Dropzone } from "../_lib/Dropzone";
+import { NextSteps } from "../_lib/NextSteps";
 import {
   getServerSnapshot,
   getSnapshot,
@@ -96,70 +97,72 @@ export default function ExtractLogsPage() {
 
   return (
     <main className="shell">
-      <Link href="/" className="back-link">
-        ← All tools
-      </Link>
-      <div className="eyebrow">tagmatch / tools / extract-logs</div>
-      <h1>Log Extraction</h1>
-      <p className="lede">
-        Upload one or more log files (Logcat, NDJSON, Dev JSON, Firebase).
-        They&apos;re parsed, merged, and deduplicated into a single events
-        table.
-      </p>
+      <div className="narrow">
+        <div className="eyebrow">tagmatch / tools / extract-logs</div>
+        <h1>Extração de Logs</h1>
+        <p className="lede">
+          Suba um ou mais arquivos de log (Logcat, NDJSON, Dev JSON, Firebase).
+          Eles são interpretados, mesclados e deduplicados numa tabela única de
+          eventos.
+        </p>
 
-      <form onSubmit={handleSubmit} className="panel control-panel">
-        <label className="file-input-label">
-          <input
-            type="file"
+        <form onSubmit={handleSubmit} className="panel control-panel">
+          <Dropzone
             accept=".txt,.log,.json,.ndjson"
             multiple
-            onChange={(e) => setFiles(Array.from(e.target.files ?? []))}
+            onFiles={(picked) => setFiles(picked)}
+            selectedLabel={
+              files.length === 0
+                ? restoredFiles
+                  ? restoredFiles.join(", ")
+                  : null
+                : files.length === 1
+                  ? files[0].name
+                  : `${files.length} arquivos`
+            }
+            idle="Arraste os arquivos de log, ou clique para escolher"
+            hint=".txt · .log · .json · .ndjson"
           />
-          Choose files
-        </label>
-        <span className="file-name">
-          {files.length === 0
-            ? (restoredFiles ? restoredFiles.join(", ") : "No files chosen")
-            : files.length === 1
-              ? files[0].name
-              : `${files.length} files`}
-        </span>
-        <select value={format} onChange={(e) => setFormat(e.target.value)} aria-label="Log format">
-          <option value="auto">auto-detect (default)</option>
-          <option value="logcat">logcat</option>
-          <option value="ndjson">ndjson</option>
-          <option value="dev_json">dev_json</option>
-          <option value="firebase_javascript">firebase_javascript</option>
-        </select>
-        <input
-          value={tz}
-          onChange={(e) => setTz(e.target.value)}
-          aria-label="Timezone"
-          className="tz-input"
-        />
-        <button type="submit" className="btn btn-primary" disabled={files.length === 0 || loading}>
-          {loading ? "Extracting…" : "Extract →"}
-        </button>
-      </form>
+          <div className="control-row">
+            <select value={format} onChange={(e) => setFormat(e.target.value)} aria-label="Formato do log">
+              <option value="auto">detecção automática (padrão)</option>
+              <option value="logcat">logcat</option>
+              <option value="ndjson">ndjson</option>
+              <option value="dev_json">dev_json</option>
+              <option value="firebase_javascript">firebase_javascript</option>
+            </select>
+            <input
+              value={tz}
+              onChange={(e) => setTz(e.target.value)}
+              aria-label="Fuso horário"
+              className="tz-input"
+            />
+            <button type="submit" className="btn btn-primary" disabled={files.length === 0 || loading}>
+              {loading ? "Extraindo…" : "Extrair →"}
+            </button>
+          </div>
+        </form>
 
-      {restoredFiles && result && result.ok && (
-        <p className="handoff-banner">
-          Logs da sessão · {restoredFiles.join(", ")} · {result.logs.length} eventos.
-        </p>
-      )}
+        {restoredFiles && result && result.ok && (
+          <p className="handoff-banner">
+            Logs da sessão · {restoredFiles.join(", ")} · {result.logs.length} eventos.
+          </p>
+        )}
 
-      {result && !result.ok && (
-        <p className="alert-error">Couldn&apos;t extract logs: {result.error}</p>
-      )}
+        {result && !result.ok && (
+          <p className="alert-error">Não consegui extrair os logs: {result.error}</p>
+        )}
+      </div>
 
       {result && result.ok && (
         <>
           {reportFailedFiles.length > 0 && (
-            <p className="alert-warning">
-              {reportFailedFiles.length} of {reportFiles.length}{" "}
-              file(s) couldn&apos;t be parsed — see Full report below for
-              details.
-            </p>
+            <div className="narrow">
+              <p className="alert-warning">
+                {reportFailedFiles.length} de {reportFiles.length} arquivo(s) não
+                puderam ser interpretados — veja o relatório completo abaixo.
+              </p>
+            </div>
           )}
           <ResultsPanel
             rows={result.logs}
@@ -168,6 +171,7 @@ export default function ExtractLogsPage() {
             badgeColumn="name_norm"
             downloadBaseName="logs"
           />
+          <NextSteps tool="extract-logs" />
         </>
       )}
     </main>
