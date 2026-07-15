@@ -9,6 +9,9 @@ type ValidationIssue = { field?: string; spec_value?: unknown; log_value?: unkno
 type MatchDetailDrawerProps = {
   row: MatchRow;
   onClose: () => void;
+  onPrev?: () => void;
+  onNext?: () => void;
+  position?: { index: number; total: number };
 };
 
 const COMPARE_FIELDS: { specKey: string; logKey: string; label: string }[] = [
@@ -18,14 +21,21 @@ const COMPARE_FIELDS: { specKey: string; logKey: string; label: string }[] = [
   { specKey: "lb", logKey: "matched_eventLabel", label: "lb / eventLabel" },
 ];
 
-export function MatchDetailDrawer({ row, onClose }: MatchDetailDrawerProps) {
+export function MatchDetailDrawer({ row, onClose, onPrev, onNext, position }: MatchDetailDrawerProps) {
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
       if (e.key === "Escape") onClose();
+      else if (e.key === "ArrowDown" && onNext) {
+        e.preventDefault();
+        onNext();
+      } else if (e.key === "ArrowUp" && onPrev) {
+        e.preventDefault();
+        onPrev();
+      }
     }
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [onClose]);
+  }, [onClose, onNext, onPrev]);
 
   const matched = row.matched === true;
   const issues = Array.isArray(row.validation_issues) ? (row.validation_issues as ValidationIssue[]) : [];
@@ -37,9 +47,22 @@ export function MatchDetailDrawer({ row, onClose }: MatchDetailDrawerProps) {
           <h3>
             #{String(row.event_order ?? "?")} {String(row.name ?? "")}
           </h3>
-          <button className="btn btn-ghost" onClick={onClose}>
-            Close ✕
-          </button>
+          <div className="drawer-nav">
+            {position && (
+              <span className="mono drawer-position">
+                {position.index + 1} de {position.total}
+              </span>
+            )}
+            <button className="btn btn-ghost" onClick={onPrev} disabled={!onPrev} aria-label="Anterior">
+              ↑
+            </button>
+            <button className="btn btn-ghost" onClick={onNext} disabled={!onNext} aria-label="Próximo">
+              ↓
+            </button>
+            <button className="btn btn-ghost" onClick={onClose}>
+              Fechar ✕
+            </button>
+          </div>
         </div>
 
         <div className="drawer-meta">
@@ -51,7 +74,7 @@ export function MatchDetailDrawer({ row, onClose }: MatchDetailDrawerProps) {
           <span className="mono drawer-meta-item">reason: {String(row.match_reason ?? "")}</span>
         </div>
 
-        <div className="drawer-section-label">Spec vs matched log</div>
+        <div className="drawer-section-label">Spec vs log casado</div>
         <table className="drawer-compare">
           <thead>
             <tr>
@@ -76,9 +99,9 @@ export function MatchDetailDrawer({ row, onClose }: MatchDetailDrawerProps) {
           </tbody>
         </table>
 
-        <div className="drawer-section-label">Field divergences</div>
+        <div className="drawer-section-label">Divergências de campo</div>
         {issues.length === 0 ? (
-          <p className="drawer-no-issues">No field divergences reported.</p>
+          <p className="drawer-no-issues">Nenhuma divergência de campo.</p>
         ) : (
           <table className="drawer-compare">
             <thead>

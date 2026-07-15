@@ -1,9 +1,10 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { ResultsPanel, type ResultRow } from "../_lib/ResultsPanel";
 import { MatchDetailDrawer, type MatchRow } from "./MatchDetailDrawer";
+import { Dropzone } from "../_lib/Dropzone";
+import { StatRail } from "../_lib/StatRail";
 import {
   getServerSnapshot,
   getSnapshot,
@@ -36,7 +37,7 @@ export default function MatchPage() {
   const [logsFile, setLogsFile] = useState<File | null>(null);
   const [result, setResult] = useState<MatchResult | null>(null);
   const [loading, setLoading] = useState(false);
-  const [drawerRow, setDrawerRow] = useState<MatchRow | null>(null);
+  const [drawerIndex, setDrawerIndex] = useState<number | null>(null);
   const [fromHandoff, setFromHandoff] = useState(false);
   const [handoffCount, setHandoffCount] = useState(0);
   const [sessionFileName, setSessionFileName] = useState<string | null>(null);
@@ -89,7 +90,7 @@ export default function MatchPage() {
     if (!specFile || !logsFile) return;
     setLoading(true);
     setResult(null);
-    setDrawerRow(null);
+    setDrawerIndex(null);
     const formData = new FormData();
     formData.append("spec", specFile);
     formData.append("logs", logsFile);
@@ -112,71 +113,84 @@ export default function MatchPage() {
         }))
       : [];
 
+  const matches = result && result.ok ? result.matches : [];
+  const coveragePct = result && result.ok ? Number(result.summary.coverage_pct ?? 0) : 0;
+  const coverageTone =
+    coveragePct >= 80 ? "var(--nonint)" : coveragePct >= 50 ? "var(--warning)" : "var(--error)";
+
   return (
     <main className="shell">
-      <Link href="/" className="back-link">
-        ← All tools
-      </Link>
-      <div className="eyebrow">tagmatch / tools / match</div>
-      <h1>Matching</h1>
-      <p className="lede">
-        Upload an extracted spec and extracted logs. See which spec events
-        fired, with confidence, divergences, and the logs that matched
-        nothing.
-      </p>
+      <div className="narrow">
+        <div className="eyebrow">tagmatch / tools / match</div>
+        <h1>Matching</h1>
+        <p className="lede">
+          Use um spec extraído e os logs extraídos. Veja quais eventos do spec
+          dispararam, com confiança, divergências e os logs que não casaram com
+          nada.
+        </p>
 
-      <div className="panel control-panel">
-        <label className="file-input-label">
-          <input
-            type="file"
+        <div className="panel control-panel">
+          <Dropzone
             accept=".json,.csv"
-            onChange={(e) => {
+            onFiles={(files) => {
               specTouched.current = true;
-              setSpecFile(e.target.files?.[0] ?? null);
+              setSpecFile(files[0] ?? null);
               setFromHandoff(false);
             }}
+            selectedLabel={specFile ? specFile.name : null}
+            idle="Arraste o spec (.json/.csv), ou clique para escolher"
+            hint="spec · da Extração de Mapa"
           />
-          Choose spec
-        </label>
-        <span className="file-name">{specFile ? specFile.name : "No spec chosen"}</span>
-        <label className="file-input-label">
-          <input
-            type="file"
+          <Dropzone
             accept=".json,.csv"
-            onChange={(e) => {
+            onFiles={(files) => {
               logsTouched.current = true;
-              setLogsFile(e.target.files?.[0] ?? null);
+              setLogsFile(files[0] ?? null);
               setLogsFromSessionCount(0);
             }}
+            selectedLabel={logsFile ? logsFile.name : null}
+            idle="Arraste os logs (.json/.csv), ou clique para escolher"
+            hint="logs · da Extração de Logs"
           />
-          Choose logs
-        </label>
-        <span className="file-name">{logsFile ? logsFile.name : "No logs chosen"}</span>
-        <button className="btn btn-primary" onClick={handleMatch} disabled={!specFile || !logsFile || loading}>
-          {loading ? "Matching…" : "Match →"}
-        </button>
+          <div className="control-row">
+            <button className="btn btn-primary" onClick={handleMatch} disabled={!specFile || !logsFile || loading}>
+              {loading ? "Casando…" : "Casar →"}
+            </button>
+          </div>
+        </div>
+
+        {fromHandoff && specFile && (
+          <p className="handoff-banner">
+            Spec do mapa da sessão{sessionFileName ? ` · ${sessionFileName}` : ""} · {handoffCount} eventos.
+          </p>
+        )}
+        {logsFromSessionCount > 0 && logsFile && (
+          <p className="handoff-banner">Logs da sessão · {logsFromSessionCount} eventos.</p>
+        )}
+
+        {result && !result.ok && (
+          <p className="alert-error">Não consegui rodar o matching: {result.error}</p>
+        )}
       </div>
-
-      {fromHandoff && specFile && (
-        <p className="handoff-banner">
-          Spec do mapa da sessão{sessionFileName ? ` · ${sessionFileName}` : ""} · {handoffCount} eventos.
-        </p>
-      )}
-      {logsFromSessionCount > 0 && logsFile && (
-        <p className="handoff-banner">Logs da sessão · {logsFromSessionCount} eventos.</p>
-      )}
-
-      {result && !result.ok && <p className="alert-error">Couldn&apos;t run matching: {result.error}</p>}
 
       {result && result.ok && (
         <>
-          <div className="stats">
-            {summaryTiles.map((t) => (
-              <div className="stat" key={t.key}>
-                <div className="stat-label">{t.key.replace(/_/g, " ")}</div>
-                <div className="stat-value">{String(t.value)}</div>
-              </div>
-            ))}
+          <div className="narrow">
+            <StatRail
+              stats={summaryTiles.map((t) => {
+                const isCoverage = t.key === "coverage_pct";
+                return {
+                  label: t.key.replace(/_/g, " "),
+                  value: isCoverage ? `${Number(t.value).toFixed(1)}%` : String(t.value),
+                  tone: isCoverage ? ("accent" as const) : ("default" as const),
+                  accessory: isCoverage ? (
+                    <div className="coverage-bar">
+                      <span style={{ width: `${Math.min(100, coveragePct)}%`, background: coverageTone }} />
+                    </div>
+                  ) : undefined,
+                };
+              })}
+            />
           </div>
 
           <ResultsPanel
@@ -185,7 +199,7 @@ export default function MatchPage() {
             entityLabel="Matches"
             badgeColumn="name"
             downloadBaseName="matches"
-            onRowClick={(row: ResultRow) => setDrawerRow(row as MatchRow)}
+            onRowClick={(row: ResultRow) => setDrawerIndex(result.matches.indexOf(row))}
           />
 
           <ResultsPanel
@@ -198,7 +212,15 @@ export default function MatchPage() {
         </>
       )}
 
-      {drawerRow && <MatchDetailDrawer row={drawerRow} onClose={() => setDrawerRow(null)} />}
+      {drawerIndex !== null && matches[drawerIndex] && (
+        <MatchDetailDrawer
+          row={matches[drawerIndex] as MatchRow}
+          position={{ index: drawerIndex, total: matches.length }}
+          onPrev={drawerIndex > 0 ? () => setDrawerIndex(drawerIndex - 1) : undefined}
+          onNext={drawerIndex < matches.length - 1 ? () => setDrawerIndex(drawerIndex + 1) : undefined}
+          onClose={() => setDrawerIndex(null)}
+        />
+      )}
     </main>
   );
 }

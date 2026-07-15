@@ -1754,3 +1754,15 @@ tbody tr:hover {
   display: block;
   height: 100%;
 }
+
+.drawer-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.drawer-position {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-right: 4px;
+}
