@@ -35,6 +35,7 @@ type MapRecord = { fileName: string; spec: SpecRow[]; report: Report };
 const DB_NAME = "tagmatch-tools";
 const STORE_NAME = "session";
 const SESSION_ID_KEY = "tagmatch:session-id";
+const GC_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 const EMPTY_META: SessionMeta = { map: null, logs: null };
 
 const cache: { map: SessionMap | null; logs: SessionLogs | null } = {
@@ -87,15 +88,32 @@ function requestToPromise<T>(req: IDBRequest<T>): Promise<T> {
   });
 }
 
+// Every stored value is wrapped in an envelope { t, v } so the garbage
+// collector can tell fresh records (possibly another live tab) from stale
+// ones (a tab closed more than GC_MAX_AGE_MS ago).
+function envelopeTimestamp(stored: unknown): number | null {
+  if (typeof stored !== "object" || stored === null) return null;
+  const e = stored as Record<string, unknown>;
+  return typeof e.t === "number" && "v" in e ? e.t : null;
+}
+
 async function idbGet(key: string): Promise<unknown> {
   const db = await openDb();
-  return requestToPromise(db.transaction(STORE_NAME).objectStore(STORE_NAME).get(key));
+  const stored = await requestToPromise(
+    db.transaction(STORE_NAME).objectStore(STORE_NAME).get(key)
+  );
+  // Foreign/corrupt shapes (no valid envelope) are treated as absent.
+  if (envelopeTimestamp(stored) === null) return undefined;
+  return (stored as { v: unknown }).v;
 }
 
 async function idbPut(key: string, value: unknown): Promise<void> {
   const db = await openDb();
   await requestToPromise(
-    db.transaction(STORE_NAME, "readwrite").objectStore(STORE_NAME).put(value, key)
+    db
+      .transaction(STORE_NAME, "readwrite")
+      .objectStore(STORE_NAME)
+      .put({ t: Date.now(), v: value }, key)
   );
 }
 
@@ -107,15 +125,23 @@ async function idbDelete(keys: string[]): Promise<void> {
 
 async function idbGcOrphans(currentId: string): Promise<void> {
   const db = await openDb();
-  const keys = await requestToPromise(
-    db.transaction(STORE_NAME).objectStore(STORE_NAME).getAllKeys()
-  );
-  const orphans = keys.filter(
-    (k): k is string => typeof k === "string" && !k.startsWith(`${currentId}:`)
-  );
-  if (orphans.length === 0) return;
+  const readStore = db.transaction(STORE_NAME).objectStore(STORE_NAME);
+  const [keys, values] = await Promise.all([
+    requestToPromise(readStore.getAllKeys()),
+    requestToPromise(readStore.getAll()),
+  ]);
+  const now = Date.now();
+  const stale: string[] = [];
+  keys.forEach((k, i) => {
+    if (typeof k !== "string" || k.startsWith(`${currentId}:`)) return;
+    // Records from other session ids may belong to another live tab; only
+    // delete them once they are stale (or have no valid envelope at all).
+    const t = envelopeTimestamp(values[i]);
+    if (t === null || now - t > GC_MAX_AGE_MS) stale.push(k);
+  });
+  if (stale.length === 0) return;
   const store = db.transaction(STORE_NAME, "readwrite").objectStore(STORE_NAME);
-  await Promise.all(orphans.map((k) => requestToPromise(store.delete(k))));
+  await Promise.all(stale.map((k) => requestToPromise(store.delete(k))));
 }
 
 function isMapRecord(v: unknown): v is MapRecord {

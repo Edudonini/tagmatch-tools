@@ -100,21 +100,70 @@ describe("sessionStore", () => {
     expect(await store2.loadSession()).toEqual({ map: null, logs: null });
   });
 
-  it("garbage-collects records from other (closed) sessions", async () => {
+  it("keeps fresh records from other (possibly live) tabs", async () => {
     const store = await freshStore();
     await store.saveMap(MAP);
     const oldId = sessionStorage.getItem("tagmatch:session-id");
     expect(oldId).toBeTruthy();
 
-    // New tab: fresh session id, same IndexedDB.
+    // New tab: fresh session id, same IndexedDB. It must NOT wipe the
+    // first tab's fresh records — two open tabs are independent sessions.
     sessionStorage.clear();
     const store2 = await freshStore();
     expect((await store2.loadSession()).map).toBeNull();
 
-    // The old session's records were deleted: going back to the old id finds nothing.
+    // The first tab's records survived: going back to the old id still loads the map.
     sessionStorage.setItem("tagmatch:session-id", oldId!);
     const store3 = await freshStore();
-    expect((await store3.loadSession()).map).toBeNull();
+    expect((await store3.loadSession()).map).toEqual(MAP);
+  });
+
+  it("garbage-collects stale records from closed sessions", async () => {
+    const store = await freshStore();
+    // Plant a stale record under a foreign session id directly via raw IndexedDB.
+    await new Promise<void>((resolve, reject) => {
+      const req = indexedDB.open("tagmatch-tools", 1);
+      req.onupgradeneeded = () => {
+        req.result.createObjectStore("session");
+      };
+      req.onsuccess = () => {
+        const put = req.result
+          .transaction("session", "readwrite")
+          .objectStore("session")
+          .put(
+            {
+              t: Date.now() - 25 * 60 * 60 * 1000,
+              v: { fileName: "old.svg", spec: [], report: {} },
+            },
+            "dead-session:map"
+          );
+        put.onsuccess = () => {
+          req.result.close();
+          resolve();
+        };
+        put.onerror = () => reject(put.error);
+      };
+      req.onerror = () => reject(req.error);
+    });
+
+    // Hydrating under the current session id garbage-collects the stale record.
+    await store.loadSession();
+    const keys = await new Promise<IDBValidKey[]>((resolve, reject) => {
+      const req = indexedDB.open("tagmatch-tools", 1);
+      req.onsuccess = () => {
+        const get = req.result
+          .transaction("session")
+          .objectStore("session")
+          .getAllKeys();
+        get.onsuccess = () => {
+          req.result.close();
+          resolve(get.result);
+        };
+        get.onerror = () => reject(get.error);
+      };
+      req.onerror = () => reject(req.error);
+    });
+    expect(keys).not.toContain("dead-session:map");
   });
 
   it("treats corrupt records as an empty session", async () => {
