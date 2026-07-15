@@ -199,3 +199,26 @@ def test_endpoint_invalid_json_is_400():
 
 def test_convert_events_empty_list_ok():
     assert convert_events([]) == []
+
+
+def test_convert_event_carries_source_sn_and_screens():
+    screens = [{"url": "https://whimuc.com/b/a.webp", "x": 893.0, "y": 200.0,
+                "width": 375.0, "height": 812.0, "view_box": "0 0 375 812",
+                "image_width": 375.0, "image_height": 812.0}]
+    out = convert_events([{"name": "screen_view", "sn": "/napp/fatura",
+                           "screens": screens}])[0]
+    assert out["source_sn"] == "/napp/fatura"
+    assert out["screens"] == screens
+    assert "screens" not in out["fields"]
+    assert "source_sn" not in out["fields"]
+
+
+def test_convert_event_without_screens_defaults_none():
+    out = convert_events([{"name": "interaction", "sn": "/napp/fatura"}])[0]
+    assert out["source_sn"] == "/napp/fatura"
+    assert out["screens"] is None
+
+
+def test_convert_event_without_sn_source_sn_is_none():
+    out = convert_events([{"name": "screen_view"}])[0]
+    assert out["source_sn"] is None

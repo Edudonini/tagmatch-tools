@@ -128,7 +128,7 @@ def _f(value, confidence):
 _LEGACY = {"name", "sn", "ct", "ac", "lb"}
 # Map/derivation metadata — used to derive, never emitted as a 5.0 field.
 _META = {"screen_name", "screen_description", "event_order", "spec_id", "raw_lines",
-         "confidence_score", "trigger", "bbox", "svg_bbox"}
+         "confidence_score", "trigger", "bbox", "svg_bbox", "screens"}
 
 
 def _carryable(key):
@@ -208,6 +208,8 @@ def convert_event(ev):
     return {
         "event_kind": kind,
         "event_order": ev.get("event_order"),
+        "source_sn": (str(sn).strip() or None) if sn is not None else None,
+        "screens": ev.get("screens") if isinstance(ev.get("screens"), list) else None,
         "has_error": has_error,
         "has_product": has_product,
         "fields": fields,
