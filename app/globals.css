@@ -1573,3 +1573,43 @@ tbody tr:hover {
 .next-step-hint:hover {
   text-decoration: underline;
 }
+
+/* Dropzone (drag & drop upload) */
+.dropzone {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  text-align: left;
+  padding: 18px;
+  background: var(--panel-raised);
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.dropzone:hover,
+.dropzone.dragover {
+  border-color: var(--accent);
+}
+
+.dropzone.dragover {
+  background: var(--accent-soft);
+}
+
+.dropzone-input {
+  display: none;
+}
+
+.dropzone-title {
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.dropzone-hint {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 11px;
+  color: var(--text-muted);
+}
