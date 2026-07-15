@@ -18,7 +18,7 @@ const PRIMARY_FIELDS = ["event_order", "name"];
 const GA_FIELDS_FIRST = ["sn", "ct", "ac", "lb"];
 // Derived/metadata fields: hidden from the card (pure noise for a human
 // reviewer), but preserved untouched in the row data and downloads.
-const HIDDEN_FIELDS = ["spec_id", "raw_lines", "confidence_score"];
+const HIDDEN_FIELDS = ["spec_id", "raw_lines", "confidence_score", "screens"];
 
 function isHiddenField(key: string): boolean {
   return key.startsWith("_") || key.endsWith("_regex") || HIDDEN_FIELDS.includes(key);

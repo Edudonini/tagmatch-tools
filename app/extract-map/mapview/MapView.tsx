@@ -17,7 +17,7 @@ const IDENTITY_FIELDS = ["name", "event_order", "sn"];
 // GA fields lead the param list; sn is omitted (it is the group header).
 const GA_FIELDS_FIRST = ["ct", "ac", "lb"];
 // Derived/metadata fields, hidden from the reader (same set as EventReviewCard).
-const HIDDEN_FIELDS = ["spec_id", "raw_lines", "confidence_score"];
+const HIDDEN_FIELDS = ["spec_id", "raw_lines", "confidence_score", "screens"];
 const CHIP_LIMIT = 3;
 
 function isHiddenField(key: string): boolean {
@@ -93,7 +93,7 @@ function downloadRows(rows: MapRow[], format: "json" | "csv", baseName: string) 
     blob = new Blob([JSON.stringify(rows, null, 2)], { type: "application/json" });
     filename = `${baseName}.json`;
   } else {
-    const columns = allColumnKeys(rows);
+    const columns = allColumnKeys(rows).filter((c) => c !== "screens");
     const lines = [
       columns.join(","),
       ...rows.map((row) =>
