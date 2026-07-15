@@ -1,8 +1,9 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { badgeClass, badgeLabel } from "../_lib/ResultsPanel";
+import { badgeLabel } from "../_lib/ResultsPanel";
+import { Dropzone } from "../_lib/Dropzone";
+import { StatRail } from "../_lib/StatRail";
 import {
   getServerSnapshot,
   getSnapshot,
@@ -44,12 +45,12 @@ const EMPTY_CONTEXT: ContextState = Object.fromEntries(
 ) as ContextState;
 
 const CONTEXT_LABELS: Record<ContextField, string> = {
-  department: "Department",
-  macro_journey: "Macro journey",
-  micro_journey: "Micro journey",
-  event_access_type: "Event access type",
-  client_category: "Client category",
-  origin_nv: "Origin",
+  department: "Departamento",
+  macro_journey: "Macro jornada",
+  micro_journey: "Micro jornada",
+  event_access_type: "Tipo de acesso",
+  client_category: "Categoria do cliente",
+  origin_nv: "Origem",
 };
 
 export default function ConvertTaxonomyPage() {
@@ -162,62 +163,53 @@ export default function ConvertTaxonomyPage() {
 
   return (
     <main className="shell">
-      <Link href="/" className="back-link">
-        ← All tools
-      </Link>
-      <div className="eyebrow">tagmatch / tools / convert-5.0</div>
-      <h1>Converter para 5.0</h1>
-      <p className="lede">
-        Converte um mapa extraído (App 4) para a taxonomia App 5.0 — sugestões
-        assistidas por evento, revisão sempre manual, nenhuma execução automática.
-      </p>
+      <div className="narrow">
+        <div className="eyebrow">tagmatch / tools / convert-5.0</div>
+        <h1>Converter para 5.0</h1>
+        <p className="lede">
+          Converte um mapa extraído (App 4) para a taxonomia App 5.0 — sugestões
+          assistidas por evento, revisão sempre manual, nenhuma execução automática.
+        </p>
 
-      <div className="panel control-panel">
-        <label className="file-input-label">
-          <input
-            type="file"
+        <div className="panel control-panel">
+          <Dropzone
             accept=".json"
-            onChange={(e) => handleFileChange(e.target.files?.[0] ?? null)}
+            onFiles={(files) => handleFileChange(files[0] ?? null)}
+            selectedLabel={file ? file.name : null}
+            idle="Arraste o events.json, ou clique para escolher"
+            hint=".json · da Extração de Mapa"
           />
-          Choose events file
-        </label>
-        <span className="file-name">{file ? file.name : "No file chosen"}</span>
-        {converting && !fromHandoff && <span className="qb-parsing">Convertendo…</span>}
+          {converting && !fromHandoff && <span className="qb-parsing">Convertendo…</span>}
+        </div>
+
+        {fromHandoff && converting && (
+          <p className="handoff-loading">
+            <span className="handoff-spinner" aria-hidden="true" />
+            Carregando o mapa extraído…
+          </p>
+        )}
+
+        {fromHandoff && events && (
+          <p className="handoff-banner">
+            Spec do mapa da sessão{sessionFileName ? ` · ${sessionFileName}` : ""} · {events.length} eventos.
+          </p>
+        )}
+
+        {convertError && <p className="alert-error">Não consegui converter: {convertError}</p>}
       </div>
-
-      {fromHandoff && converting && (
-        <p className="handoff-loading">
-          <span className="handoff-spinner" aria-hidden="true" />
-          Carregando o mapa extraído…
-        </p>
-      )}
-
-      {fromHandoff && events && (
-        <p className="handoff-banner">
-          Spec do mapa da sessão{sessionFileName ? ` · ${sessionFileName}` : ""} · {events.length} eventos.
-        </p>
-      )}
-
-      {convertError && <p className="alert-error">Couldn&apos;t convert: {convertError}</p>}
 
       {events && events.length > 0 && (
         <>
-          <div className="stats">
-            <div className="stat">
-              <div className="stat-label">events</div>
-              <div className="stat-value">{events.length}</div>
-            </div>
-            {Object.entries(eventTypeCounts).map(([name, count]) => (
-              <div className="stat" key={name}>
-                <div className="stat-label">
-                  <span className={`badge ${badgeClass(name)}`}>
-                    <span className="dot" />
-                    {badgeLabel(name)}
-                  </span>
-                </div>
-                <div className="stat-value">{count}</div>
-              </div>
-            ))}
+          <div className="narrow">
+            <StatRail
+              stats={[
+                { label: "eventos", value: String(events.length) },
+                ...Object.entries(eventTypeCounts).map(([name, count]) => ({
+                  label: badgeLabel(name),
+                  value: String(count),
+                })),
+              ]}
+            />
           </div>
 
           <div className="panel qb-options">
@@ -327,7 +319,7 @@ export default function ConvertTaxonomyPage() {
         </>
       )}
 
-      {events && events.length === 0 && <p className="mv-empty">No events to display.</p>}
+      {events && events.length === 0 && <p className="mv-empty">Nenhum evento para exibir.</p>}
     </main>
   );
 }
