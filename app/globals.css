@@ -1,40 +1,51 @@
+/* Design system "Instrumento de Precisao" — dark e o tema hero.
+   Laranja e o unico acento de acao; sv/int/nonint mantem a semantica
+   do board Whimsical (SV azul, INT vermelho, NONINT verde). */
 :root {
-  --bg: #0b0d12;
-  --panel: #12151c;
-  --panel-raised: #181c25;
-  --border: #262b36;
-  --text: #e7e9ee;
-  --text-muted: #8a8f9c;
-  --text-faint: #565c6b;
-  --accent: #5b8cff;
-  --accent-soft: rgba(91, 140, 255, 0.12);
-  --sv: #5b8cff;
-  --sv-soft: rgba(91, 140, 255, 0.14);
-  --int: #ff6b6b;
-  --int-soft: rgba(255, 107, 107, 0.14);
-  --nonint: #4ade80;
-  --nonint-soft: rgba(74, 222, 128, 0.14);
-  --error: #f87171;
-  --error-soft: rgba(248, 113, 113, 0.12);
-  --warning: #eab308;
-  --warning-soft: rgba(234, 179, 8, 0.14);
+  --bg: #0a0e14;
+  --panel: #10161f;
+  --panel-raised: #151d29;
+  --border: #1e2735;
+  --text: #e6ebf2;
+  --text-muted: #8b98ab;
+  --text-faint: #5c6b7f;
+  --accent: #ff6a00;
+  --accent-soft: rgba(255, 106, 0, 0.12);
+  --accent-contrast: #0a0e14;
+  --sv: #4da6ff;
+  --sv-soft: rgba(77, 166, 255, 0.14);
+  --int: #ff5c5c;
+  --int-soft: rgba(255, 92, 92, 0.14);
+  --nonint: #3ddc97;
+  --nonint-soft: rgba(61, 220, 151, 0.14);
+  --error: #ff5c5c;
+  --error-soft: rgba(255, 92, 92, 0.12);
+  --warning: #ffb020;
+  --warning-soft: rgba(255, 176, 32, 0.14);
 }
 
 @media (prefers-color-scheme: light) {
   :root {
-    --bg: #f6f7f9;
+    --bg: #f6f8fa;
     --panel: #ffffff;
-    --panel-raised: #eef0f4;
-    --border: #dde1e8;
-    --text: #14161b;
-    --text-muted: #5b6270;
-    --text-faint: #9aa1ad;
-    --accent-soft: rgba(59, 106, 224, 0.08);
-    --sv-soft: rgba(59, 106, 224, 0.1);
-    --int-soft: rgba(224, 68, 68, 0.1);
-    --nonint-soft: rgba(34, 168, 96, 0.1);
-    --error-soft: rgba(224, 68, 68, 0.08);
-    --warning-soft: rgba(202, 138, 4, 0.1);
+    --panel-raised: #eef2f6;
+    --border: #dde4ec;
+    --text: #16202b;
+    --text-muted: #5c6b7f;
+    --text-faint: #9aa3af;
+    --accent: #e55f00;
+    --accent-soft: rgba(229, 95, 0, 0.1);
+    --accent-contrast: #ffffff;
+    --sv: #1877d2;
+    --sv-soft: rgba(24, 119, 210, 0.1);
+    --int: #d93636;
+    --int-soft: rgba(217, 54, 54, 0.1);
+    --nonint: #0f9d6a;
+    --nonint-soft: rgba(15, 157, 106, 0.1);
+    --error: #d93636;
+    --error-soft: rgba(217, 54, 54, 0.08);
+    --warning: #b97709;
+    --warning-soft: rgba(185, 119, 9, 0.1);
   }
 }
 
@@ -134,8 +145,8 @@ input {
 
 h1 {
   font-size: 28px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
+  font-weight: 650;
+  letter-spacing: -0.02em;
   margin-top: 6px;
 }
 
@@ -181,8 +192,8 @@ h1 {
   width: 34px;
   height: 34px;
   border-radius: 8px;
-  background: var(--sv-soft);
-  color: var(--sv);
+  background: var(--accent-soft);
+  color: var(--accent);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -296,7 +307,7 @@ select {
 
 .btn-primary {
   background: var(--accent);
-  color: #fff;
+  color: var(--accent-contrast);
   margin-left: auto;
 }
 
@@ -409,8 +420,10 @@ thead th {
   background: var(--panel-raised);
   text-align: left;
   padding: 10px 14px;
-  font-size: 11px;
-  letter-spacing: 0.05em;
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--text-muted);
   border-bottom: 1px solid var(--border);
@@ -1193,18 +1206,18 @@ tbody tr:hover {
 .qb-cb-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
 .qb-seg { display: inline-flex; border: 1px solid rgba(128,128,128,0.3); border-radius: 8px; overflow: hidden; }
 .qb-seg-btn { padding: 7px 14px; font-size: 13px; background: transparent; border: none; cursor: pointer; color: inherit; }
-.qb-seg-btn.on { background: #5b8cff; color: #fff; font-weight: 600; }
+.qb-seg-btn.on { background: var(--accent); color: var(--accent-contrast); font-weight: 600; }
 .qb-cond-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
 .qb-cond-col, .qb-cond-op { font-family: ui-monospace, Menlo, monospace; font-size: 12px; padding: 6px 8px; border-radius: 7px; }
 .qb-cond-val { min-width: 160px; }
 .qb-cond-x { opacity: 0.5; background: none; border: none; cursor: pointer; color: inherit; font-size: 13px; }
 .qb-cond-x:hover { opacity: 1; }
 .qb-cb-actions { display: flex; align-items: center; gap: 14px; margin-top: 6px; }
-.qb-add { font-size: 13px; color: #5b8cff; background: none; border: none; cursor: pointer; padding: 0; }
-.qb-chip { font-family: ui-monospace, monospace; font-size: 12px; padding: 4px 10px; border-radius: 999px; background: rgba(91,140,255,0.14); color: #5b8cff; border: none; cursor: pointer; }
+.qb-add { font-size: 13px; color: var(--accent); background: none; border: none; cursor: pointer; padding: 0; }
+.qb-chip { font-family: ui-monospace, monospace; font-size: 12px; padding: 4px 10px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); border: none; cursor: pointer; }
 .qb-andor { display: inline-flex; border: 1px solid rgba(128,128,128,0.3); border-radius: 999px; overflow: hidden; font-family: ui-monospace, monospace; font-size: 11px; }
 .qb-andor-btn { padding: 3px 12px; background: none; border: none; cursor: pointer; color: inherit; }
-.qb-andor-btn.on { background: rgba(91,140,255,0.2); color: #5b8cff; font-weight: 700; }
+.qb-andor-btn.on { background: var(--accent-soft); color: var(--accent); font-weight: 700; }
 .qb-limit-field { display: block; margin-top: 12px; max-width: 180px; }
 .qb-hint { font-size: 11px; opacity: 0.55; margin-top: 6px; }
 .qb-cond-err { font-size: 11px; color: var(--error); margin-left: 2px; }
