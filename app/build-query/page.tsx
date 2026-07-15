@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { badgeClass, badgeLabel } from "../_lib/ResultsPanel";
-import { takeSpecHandoff, rowsToSpecFile } from "../_lib/specHandoff";
+import { loadSession, rowsToSpecFile } from "../_lib/sessionStore";
 import {
   CustomOptions,
   INITIAL_CUSTOM_STATE,
@@ -39,6 +39,7 @@ export default function BuildQueryPage() {
   const [parsing, setParsing] = useState(false);
   const [fromHandoff, setFromHandoff] = useState(false);
   const [handoffLoading, setHandoffLoading] = useState(false);
+  const [sessionFileName, setSessionFileName] = useState<string | null>(null);
 
   const [queryType, setQueryType] = useState<string>("validation");
   const [startDate, setStartDate] = useState(() => isoDaysAgo(7));
@@ -96,13 +97,22 @@ export default function BuildQueryPage() {
   }
 
   useEffect(() => {
-    const rows = takeSpecHandoff();
-    if (rows && rows.length > 0) {
-      setHandoffLoading(true);
-      handleFileChange(rowsToSpecFile(rows))
-        .then(() => setFromHandoff(true))
-        .finally(() => setHandoffLoading(false));
-    }
+    let cancelled = false;
+    setHandoffLoading(true);
+    loadSession()
+      .then(({ map }) => {
+        if (cancelled || !map || map.spec.length === 0) return;
+        setSessionFileName(map.fileName);
+        return handleFileChange(rowsToSpecFile(map.spec)).then(() => {
+          if (!cancelled) setFromHandoff(true);
+        });
+      })
+      .finally(() => {
+        if (!cancelled) setHandoffLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -204,7 +214,9 @@ export default function BuildQueryPage() {
       )}
 
       {fromHandoff && events && (
-        <p className="handoff-banner">Spec carregado da Extração de Mapa · {events.length} eventos.</p>
+        <p className="handoff-banner">
+          Spec do mapa da sessão{sessionFileName ? ` · ${sessionFileName}` : ""} · {events.length} eventos.
+        </p>
       )}
 
       {parseError && <p className="alert-error">Couldn&apos;t read the spec: {parseError}</p>}
