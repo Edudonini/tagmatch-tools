@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { badgeClass, badgeLabel } from "../_lib/ResultsPanel";
 import { loadSession, rowsToSpecFile } from "../_lib/sessionStore";
 import {
@@ -40,6 +40,7 @@ export default function BuildQueryPage() {
   const [fromHandoff, setFromHandoff] = useState(false);
   const [handoffLoading, setHandoffLoading] = useState(false);
   const [sessionFileName, setSessionFileName] = useState<string | null>(null);
+  const skipHydration = useRef(false);
 
   const [queryType, setQueryType] = useState<string>("validation");
   const [startDate, setStartDate] = useState(() => isoDaysAgo(7));
@@ -63,6 +64,7 @@ export default function BuildQueryPage() {
   }, {});
 
   async function handleFileChange(selected: File | null) {
+    skipHydration.current = true;
     setFromHandoff(false);
     setFile(selected);
     setEvents(null);
@@ -101,7 +103,7 @@ export default function BuildQueryPage() {
     setHandoffLoading(true);
     loadSession()
       .then(({ map }) => {
-        if (cancelled || !map || map.spec.length === 0) return;
+        if (cancelled || skipHydration.current || !map || map.spec.length === 0) return;
         setSessionFileName(map.fileName);
         return handleFileChange(rowsToSpecFile(map.spec)).then(() => {
           if (!cancelled) setFromHandoff(true);

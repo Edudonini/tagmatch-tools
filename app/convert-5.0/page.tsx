@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { badgeClass, badgeLabel } from "../_lib/ResultsPanel";
 import { loadSession } from "../_lib/sessionStore";
 import { ConvertCard } from "./ConvertCard";
@@ -54,6 +54,7 @@ export default function ConvertTaxonomyPage() {
   const [productJourney, setProductJourney] = useState(false);
   const [fromHandoff, setFromHandoff] = useState(false);
   const [sessionFileName, setSessionFileName] = useState<string | null>(null);
+  const skipHydration = useRef(false);
 
   async function runConvert(rows: unknown[], viaHandoff = false) {
     setConverting(true);
@@ -76,7 +77,7 @@ export default function ConvertTaxonomyPage() {
   useEffect(() => {
     let cancelled = false;
     void loadSession().then(({ map }) => {
-      if (cancelled || !map || map.spec.length === 0) return;
+      if (cancelled || skipHydration.current || !map || map.spec.length === 0) return;
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setSessionFileName(map.fileName);
       void runConvert(map.spec, true);
@@ -88,6 +89,7 @@ export default function ConvertTaxonomyPage() {
   }, []);
 
   async function handleFileChange(selected: File | null) {
+    skipHydration.current = true;
     setFromHandoff(false);
     setFile(selected);
     setEvents(null);
