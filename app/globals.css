@@ -1302,3 +1302,129 @@ tbody tr:hover {
 .session-chip-clear:hover {
   color: var(--error);
 }
+
+/* Convert 5.0 — screen sections (extração de telas) */
+.c5-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.c5-section {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--panel);
+}
+
+.c5-section-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--sv-soft);
+  border-radius: 12px 12px 0 0;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.c5-section-noscreen .c5-section-head {
+  background: var(--warning-soft);
+}
+
+.c5-section-pill {
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 1px 10px;
+}
+
+.c5-section-body {
+  display: flex;
+  gap: 16px;
+  padding: 16px;
+  align-items: flex-start;
+}
+
+.c5-screens-col {
+  width: 250px;
+  flex-shrink: 0;
+}
+
+.c5-sticky {
+  position: sticky;
+  top: 16px;
+}
+
+.c5-events-col {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.c5-screen-frame {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  background: #000;
+  cursor: zoom-in;
+}
+
+.c5-screen-img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.c5-screen-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.c5-screen-count {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.c5-screen-placeholder {
+  border: 2px dashed var(--border);
+  border-radius: 12px;
+  aspect-ratio: 375 / 812;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 14px;
+  color: var(--text-faint);
+  font-size: 0.85rem;
+}
+
+.c5-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.78);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  cursor: zoom-out;
+}
+
+.c5-lightbox-img {
+  height: min(92vh, 1200px);
+  width: auto;
+  max-width: 92vw;
+  border-radius: 12px;
+  background: #000;
+}

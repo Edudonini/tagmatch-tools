@@ -1,8 +1,22 @@
 export type Confidence = "auto" | "review" | "manual";
 export type ConvField = { value: string; confidence: Confidence };
+
+export type Screen = {
+  url: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  view_box: string | null;
+  image_width: number;
+  image_height: number;
+};
+
 export type ConvEvent = {
   event_kind: string;
   event_order: number | string | null;
+  source_sn?: string | null;
+  screens?: Screen[] | null;
   has_error: boolean;
   has_product: boolean;
   fields: Record<string, ConvField>;
