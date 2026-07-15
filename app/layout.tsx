@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { SessionBar } from "./_lib/SessionBar";
+import { AppShell } from "./_lib/AppShell";
 
 const geistSans = Geist({
   variable: "--font-sans",
@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "TagMatch Tools",
-  description: "Standalone utilities for TagMatch spec extraction and QA.",
+  description: "Utilitários standalone para extração e QA de specs do TagMatch.",
 };
 
 export default function RootLayout({
@@ -24,10 +24,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`}>
+    <html lang="pt-BR" className={`${geistSans.variable} ${geistMono.variable}`}>
       <body>
-        <SessionBar />
-        {children}
+        <AppShell>{children}</AppShell>
       </body>
     </html>
   );

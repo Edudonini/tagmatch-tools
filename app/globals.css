@@ -1255,18 +1255,92 @@ tbody tr:hover {
   cursor: not-allowed;
 }
 
-/* Session bar (loaded map / logs, shown on every page) */
-.session-bar {
+/* App top bar (persistent nav + session chips) */
+.app-topbar {
   position: sticky;
   top: 0;
   z-index: 50;
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  padding: 8px 24px;
+  align-items: center;
+  gap: 20px;
+  height: 48px;
+  padding: 0 20px;
   background: var(--panel);
   border-bottom: 1px solid var(--border);
-  font-size: 13px;
+}
+
+.app-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.app-brand-glyph {
+  width: 18px;
+  height: 18px;
+}
+
+.app-brand-name {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  color: var(--text);
+}
+
+.app-nav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.app-nav::-webkit-scrollbar {
+  display: none;
+}
+
+.app-nav-item {
+  padding: 6px 10px;
+  font-size: 13.5px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  border-bottom: 2px solid transparent;
+  transition: color 0.15s ease;
+}
+
+.app-nav-item:hover {
+  color: var(--text);
+}
+
+.app-nav-item.active {
+  color: var(--text);
+  font-weight: 600;
+  border-bottom-color: var(--accent);
+}
+
+.app-topbar-right {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.session-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 12.5px;
+}
+
+@media (max-width: 700px) {
+  .app-topbar {
+    gap: 12px;
+    padding: 0 12px;
+  }
+  .app-brand-name {
+    display: none;
+  }
 }
 
 .session-chip {

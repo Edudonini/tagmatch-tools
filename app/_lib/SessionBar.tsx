@@ -1,28 +1,22 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useSyncExternalStore } from "react";
+import { useSyncExternalStore } from "react";
 import {
   clearLogs,
   clearMap,
   getServerSnapshot,
   getSnapshot,
-  loadSession,
   subscribe,
 } from "./sessionStore";
 
+/** Session chips (loaded map / logs). Rendered inside the AppShell top bar. */
 export function SessionBar() {
   const meta = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
-
-  // Kick off hydration so the bar appears even before any page reads the session.
-  useEffect(() => {
-    void loadSession();
-  }, []);
-
   if (!meta.map && !meta.logs) return null;
 
   return (
-    <div className="session-bar">
+    <div className="session-chips">
       {meta.map && (
         <span className="session-chip">
           <Link href="/extract-map" className="session-chip-link">
