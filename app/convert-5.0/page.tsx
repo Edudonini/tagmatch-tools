@@ -10,6 +10,8 @@ import {
   subscribe,
 } from "../_lib/sessionStore";
 import { ConvertCard } from "./ConvertCard";
+import { groupBySn } from "./grouping";
+import { ScreenPanel } from "./ScreenPanel";
 import { CONTEXT_FIELDS, ENUMS, validate, toBlock, withProductDisambiguation, type ConvEvent } from "./taxonomy5";
 
 async function convert(rows: unknown[]): Promise<ConvEvent[]> {
@@ -156,6 +158,8 @@ export default function ConvertTaxonomyPage() {
     0
   );
 
+  const grouped = groupBySn(events ?? []);
+
   return (
     <main className="shell">
       <Link href="/" className="back-link">
@@ -265,14 +269,60 @@ export default function ConvertTaxonomyPage() {
             </button>
           </div>
 
-          <div className="convert5-cards">
-            {events.map((ev, i) => (
-              <ConvertCard
-                key={`${String(ev.event_order ?? "?")}-${i}`}
-                event={ev}
-                onChange={(updated) => updateEvent(i, updated)}
-              />
+          <div className="c5-sections">
+            {grouped.withScreenView.map((group) => (
+              <section className="c5-section" key={group.sn || "(sem sn)"}>
+                <div className="c5-section-head">
+                  <span>📱 {group.sn || "(sem sn)"}</span>
+                  <span className="c5-section-pill">
+                    {group.screens.length} tela{group.screens.length === 1 ? "" : "s"} ·{" "}
+                    {group.events.length} evento{group.events.length === 1 ? "" : "s"}
+                  </span>
+                </div>
+                <div className="c5-section-body">
+                  <div className="c5-screens-col">
+                    <div className="c5-sticky">
+                      <ScreenPanel screens={group.screens} />
+                    </div>
+                  </div>
+                  <div className="c5-events-col">
+                    {group.events.map(({ ev, index }) => (
+                      <ConvertCard
+                        key={`${String(ev.event_order ?? "?")}-${index}`}
+                        event={ev}
+                        onChange={(updated) => updateEvent(index, updated)}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </section>
             ))}
+            {grouped.without.length > 0 && (
+              <section className="c5-section c5-section-noscreen">
+                <div className="c5-section-head">
+                  <span>⚠️ Sem tela no mapa</span>
+                  <span className="c5-section-pill">
+                    {grouped.without.reduce((n, g) => n + g.events.length, 0)} eventos
+                  </span>
+                </div>
+                <div className="c5-section-body">
+                  <div className="c5-screens-col">
+                    <div className="c5-screen-placeholder">
+                      Nenhum screen_view com este screenName no mapa
+                    </div>
+                  </div>
+                  <div className="c5-events-col">
+                    {grouped.without.flatMap((g) => g.events).map(({ ev, index }) => (
+                      <ConvertCard
+                        key={`${String(ev.event_order ?? "?")}-${index}`}
+                        event={ev}
+                        onChange={(updated) => updateEvent(index, updated)}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </section>
+            )}
           </div>
         </>
       )}
