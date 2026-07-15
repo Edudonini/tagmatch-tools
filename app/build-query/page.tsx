@@ -1,8 +1,9 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { badgeClass, badgeLabel } from "../_lib/ResultsPanel";
+import { badgeLabel } from "../_lib/ResultsPanel";
+import { Dropzone } from "../_lib/Dropzone";
+import { StatRail } from "../_lib/StatRail";
 import {
   getServerSnapshot,
   getSnapshot,
@@ -207,87 +208,76 @@ export default function BuildQueryPage() {
 
   return (
     <main className="shell">
-      <Link href="/" className="back-link">
-        ← All tools
-      </Link>
-      <div className="eyebrow">tagmatch / tools / build-query</div>
-      <h1>Query Builder</h1>
-      <p className="lede">
-        Upload a spec from Map Extraction and generate Databricks SQL —
-        validation, volumetry, funnel, or custom queries.
-      </p>
+      <div className="narrow">
+        <div className="eyebrow">tagmatch / tools / build-query</div>
+        <h1>Query Builder</h1>
+        <p className="lede">
+          Use um spec da Extração de Mapa e gere SQL do Databricks — validation,
+          volumetry, funnel ou custom.
+        </p>
 
-      <div className="panel control-panel">
-        <label className="file-input-label">
-          <input
-            type="file"
+        <div className="panel control-panel">
+          <Dropzone
             accept=".json,.csv"
-            onChange={(e) => handleFileChange(e.target.files?.[0] ?? null)}
+            onFiles={(files) => handleFileChange(files[0] ?? null)}
+            selectedLabel={file ? file.name : null}
+            idle="Arraste o spec (.json/.csv), ou clique para escolher"
+            hint=".json · .csv · da Extração de Mapa"
           />
-          Choose spec file
-        </label>
-        <span className="file-name">{file ? file.name : "No file chosen"}</span>
-        {parsing && <span className="qb-parsing">Parsing…</span>}
+          {parsing && <span className="qb-parsing">Interpretando…</span>}
+        </div>
+
+        {handoffLoading && (
+          <p className="handoff-loading">
+            <span className="handoff-spinner" aria-hidden="true" />
+            Carregando o mapa extraído…
+          </p>
+        )}
+
+        {fromHandoff && events && (
+          <p className="handoff-banner">
+            Spec do mapa da sessão{sessionFileName ? ` · ${sessionFileName}` : ""} · {events.length} eventos.
+          </p>
+        )}
+
+        {parseError && <p className="alert-error">Não consegui ler o spec: {parseError}</p>}
       </div>
 
-      {handoffLoading && (
-        <p className="handoff-loading">
-          <span className="handoff-spinner" aria-hidden="true" />
-          Carregando o mapa extraído…
-        </p>
-      )}
-
-      {fromHandoff && events && (
-        <p className="handoff-banner">
-          Spec do mapa da sessão{sessionFileName ? ` · ${sessionFileName}` : ""} · {events.length} eventos.
-        </p>
-      )}
-
-      {parseError && <p className="alert-error">Couldn&apos;t read the spec: {parseError}</p>}
-
       {events && (
-        <>
-          <div className="stats">
-            <div className="stat">
-              <div className="stat-label">events</div>
-              <div className="stat-value">{events.length}</div>
-            </div>
-            {Object.entries(eventTypeCounts).map(([name, count]) => (
-              <div className="stat" key={name}>
-                <div className="stat-label">
-                  <span className={`badge ${badgeClass(name)}`}>
-                    <span className="dot" />
-                    {badgeLabel(name)}
-                  </span>
-                </div>
-                <div className="stat-value">{count}</div>
-              </div>
-            ))}
-          </div>
+        <div className="narrow">
+          <StatRail
+            stats={[
+              { label: "eventos", value: String(events.length) },
+              ...Object.entries(eventTypeCounts).map(([name, count]) => ({
+                label: badgeLabel(name),
+                value: String(count),
+              })),
+            ]}
+          />
 
           <div className="panel qb-options">
             <div className="qb-row">
               <label className="review-field-label">
-                Query type
+                Tipo de query
                 <select value={queryType} onChange={(e) => setQueryType(e.target.value)}>
                   {QUERY_TYPES.map((t) => (
                     <option key={t.value} value={t.value} disabled={t.value === "funnel" && funnelDisabled}>
                       {t.label}
-                      {t.value === "funnel" && funnelDisabled ? " — no screen_view events in this spec" : ""}
+                      {t.value === "funnel" && funnelDisabled ? " — sem eventos screen_view neste spec" : ""}
                     </option>
                   ))}
                 </select>
               </label>
               <label className="review-field-label">
-                Start date
+                Data inicial
                 <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="review-field-input" />
               </label>
               <label className="review-field-label">
-                End date
+                Data final
                 <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="review-field-input" />
               </label>
               <label className="review-field-label">
-                Count mode
+                Modo de contagem
                 <select value={countMode} onChange={(e) => setCountMode(e.target.value)}>
                   <option value="session">session</option>
                   <option value="event">event</option>
@@ -298,7 +288,7 @@ export default function BuildQueryPage() {
             {queryType === "validation" && (
               <div className="qb-row">
                 <label className="review-field-label">
-                  Samples per event (1–100)
+                  Amostras por evento (1–100)
                   <input
                     type="number"
                     min={1}
@@ -314,7 +304,7 @@ export default function BuildQueryPage() {
             {queryType === "volumetry" && (
               <div className="qb-row">
                 <label className="review-field-label">
-                  Group by
+                  Agrupar por
                   <select value={groupBy} onChange={(e) => setGroupBy(e.target.value)}>
                     <option value="event">event</option>
                     <option value="day">day</option>
@@ -327,14 +317,14 @@ export default function BuildQueryPage() {
                     checked={includeEventCount}
                     onChange={(e) => setIncludeEventCount(e.target.checked)}
                   />
-                  Include event count
+                  Incluir contagem de eventos
                 </label>
               </div>
             )}
 
             {queryType === "funnel" && (
               <div className="qb-funnel">
-                <div className="qb-section-label">Screen order</div>
+                <div className="qb-section-label">Ordem das telas</div>
                 {screenOrder.map((sn, i) => (
                   <div key={`${sn}-${i}`} className="qb-funnel-step">
                     <span className="mono qb-funnel-num">{i + 1}.</span>
@@ -359,9 +349,9 @@ export default function BuildQueryPage() {
             )}
 
             <details className="report-details">
-              <summary>Advanced — target table</summary>
+              <summary>Avançado — tabela de destino</summary>
               <label className="review-field-label qb-table-field">
-                Databricks table
+                Tabela do Databricks
                 <input
                   value={tableName}
                   onChange={(e) => setTableName(e.target.value)}
@@ -372,25 +362,29 @@ export default function BuildQueryPage() {
 
             <div className="qb-generate-row">
               <button className="btn btn-primary" onClick={handleGenerate} disabled={generateDisabled}>
-                {generating ? "Generating…" : "Generate SQL →"}
+                {generating ? "Gerando…" : "Gerar SQL →"}
               </button>
             </div>
           </div>
-        </>
+        </div>
       )}
 
-      {result && !result.ok && <p className="alert-error">Couldn&apos;t generate the query: {result.error}</p>}
+      {result && !result.ok && (
+        <div className="narrow">
+          <p className="alert-error">Não consegui gerar a query: {result.error}</p>
+        </div>
+      )}
 
       {result && result.ok && (
-        <div className="qb-result">
+        <div className="narrow qb-result">
           <div className="results-header">
-            <h2>Generated SQL</h2>
+            <h2>SQL gerado</h2>
             <div className="results-actions">
               <button className="btn btn-ghost" onClick={copyQuery}>
-                Copy
+                Copiar
               </button>
               <button className="btn btn-ghost" onClick={downloadQuery}>
-                Download .sql
+                Baixar .sql
               </button>
             </div>
           </div>
