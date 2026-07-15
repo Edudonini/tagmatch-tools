@@ -29,7 +29,12 @@ export const ERROR_FIELDS = ["error_status", "error_type", "error_code"] as cons
 export const PRODUCT_FIELDS = ["plan_name", "event_plan_type"] as const;
 
 // Fields the journey-context form fills/overrides across all events.
-export const CONTEXT_FIELDS = ["department", "macro_journey", "event_access_type", "client_category", "origin_nv"] as const;
+export const CONTEXT_FIELDS = ["department", "macro_journey", "micro_journey", "event_access_type", "client_category", "origin_nv"] as const;
+
+const PLAN_PLACEHOLDER: Record<string, string> = {
+  plan_name: "[nome_do_plano]",
+  event_plan_type: "[tipo_do_plano]",
+};
 
 // snake_case + ASCII, mirror of the backend normalize (screenName/error_code excluded).
 export function normalize(text: string): string {
@@ -101,4 +106,18 @@ export function withToggles(ev: ConvEvent, hasError: boolean, hasProduct: boolea
   };
   if (hasError) ensure(ERROR_FIELDS); if (hasProduct) ensure(PRODUCT_FIELDS);
   return { ...ev, has_error: hasError, has_product: hasProduct, fields };
+}
+
+// Mark an event as a product-disambiguation journey: enable the product set and
+// seed each plan field with its dynamic `[placeholder]` where empty (existing
+// plan values are preserved). Used to apply the flag across the whole map.
+export function withProductDisambiguation(ev: ConvEvent): ConvEvent {
+  const base = withToggles(ev, ev.has_error, true);
+  const fields = { ...base.fields };
+  for (const k of PRODUCT_FIELDS) {
+    if (!(fields[k]?.value ?? "").trim()) {
+      fields[k] = { value: PLAN_PLACEHOLDER[k], confidence: "review" };
+    }
+  }
+  return { ...base, fields };
 }

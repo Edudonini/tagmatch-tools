@@ -60,7 +60,7 @@ export function ConvertCard({ event, onChange }: ConvertCardProps) {
             <div className="convert5-field-row" key={key}>
               <label className="review-field-label convert5-field-label">
                 {key}
-                {ENUMS[key] ? (
+                {ENUMS[key] && !/^\[.*\]$/.test(field.value.trim()) ? (
                   <select
                     className="review-field-input"
                     value={field.value}

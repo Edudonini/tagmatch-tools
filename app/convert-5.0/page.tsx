@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { badgeClass, badgeLabel } from "../_lib/ResultsPanel";
 import { takeSpecHandoff } from "../_lib/specHandoff";
 import { ConvertCard } from "./ConvertCard";
-import { CONTEXT_FIELDS, ENUMS, validate, toBlock, type ConvEvent } from "./taxonomy5";
+import { CONTEXT_FIELDS, ENUMS, validate, toBlock, withProductDisambiguation, type ConvEvent } from "./taxonomy5";
 
 async function convert(rows: unknown[]): Promise<ConvEvent[]> {
   const res = await fetch("/api/convert-taxonomy", {
@@ -39,6 +39,7 @@ const EMPTY_CONTEXT: ContextState = Object.fromEntries(
 const CONTEXT_LABELS: Record<ContextField, string> = {
   department: "Department",
   macro_journey: "Macro journey",
+  micro_journey: "Micro journey",
   event_access_type: "Event access type",
   client_category: "Client category",
   origin_nv: "Origin",
@@ -50,6 +51,7 @@ export default function ConvertTaxonomyPage() {
   const [journeyContext, setJourneyContext] = useState<ContextState>({ ...EMPTY_CONTEXT });
   const [converting, setConverting] = useState(false);
   const [convertError, setConvertError] = useState<string | null>(null);
+  const [productJourney, setProductJourney] = useState(false);
   const [fromHandoff, setFromHandoff] = useState(false);
 
   async function runConvert(rows: unknown[], viaHandoff = false) {
@@ -103,7 +105,9 @@ export default function ConvertTaxonomyPage() {
 
   function applyContextToAll() {
     if (!events) return;
-    setEvents(applyContext(events, journeyContext));
+    let next = applyContext(events, journeyContext);
+    if (productJourney) next = next.map(withProductDisambiguation);
+    setEvents(next);
   }
 
   function updateEvent(index: number, updated: ConvEvent) {
@@ -209,6 +213,14 @@ export default function ConvertTaxonomyPage() {
                 </label>
               ))}
             </div>
+            <label className="convert5-check">
+              <input
+                type="checkbox"
+                checked={productJourney}
+                onChange={(e) => setProductJourney(e.target.checked)}
+              />
+              Jornada de desambiguação de produto (adiciona plan_name / event_plan_type em todos os eventos)
+            </label>
             <div className="qb-generate-row">
               <button className="btn btn-primary" onClick={applyContextToAll}>
                 Aplicar a todos
