@@ -78,14 +78,12 @@ export default function ConvertTaxonomyPage() {
     let cancelled = false;
     void loadSession().then(({ map }) => {
       if (cancelled || skipHydration.current || !map || map.spec.length === 0) return;
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSessionFileName(map.fileName);
       void runConvert(map.spec, true);
     });
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function handleFileChange(selected: File | null) {

@@ -100,6 +100,8 @@ export default function BuildQueryPage() {
 
   useEffect(() => {
     let cancelled = false;
+    // Intentional fetch-on-mount loading state; cascading-render warning accepted.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setHandoffLoading(true);
     loadSession()
       .then(({ map }) => {
@@ -115,7 +117,6 @@ export default function BuildQueryPage() {
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function moveScreen(index: number, delta: number) {
