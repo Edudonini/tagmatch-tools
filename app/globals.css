@@ -1254,3 +1254,51 @@ tbody tr:hover {
   opacity: 0.4;
   cursor: not-allowed;
 }
+
+/* Session bar (loaded map / logs, shown on every page) */
+.session-bar {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 24px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+
+.session-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: var(--accent-soft);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text);
+}
+
+.session-chip-link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.session-chip-link:hover {
+  text-decoration: underline;
+}
+
+.session-chip-clear {
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+  padding: 0 2px;
+}
+
+.session-chip-clear:hover {
+  color: var(--error);
+}
