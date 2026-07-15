@@ -1613,3 +1613,129 @@ tbody tr:hover {
   font-size: 11px;
   color: var(--text-muted);
 }
+
+/* Stat rail (shared scalar metrics) */
+.stat-rail {
+  margin-top: 28px;
+  display: flex;
+  flex-wrap: wrap;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel);
+  padding: 14px 0;
+}
+
+.stat-rail-item {
+  padding: 0 20px;
+  border-right: 1px solid var(--border);
+}
+
+.stat-rail-item:last-child {
+  border-right: none;
+}
+
+.stat-rail-label {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+
+.stat-rail-value {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+
+.stat-rail-value.accent {
+  color: var(--accent);
+}
+
+/* Results filters (search + type chips) */
+.results-filters {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 14px 0 10px;
+}
+
+.results-search {
+  flex: 1;
+  min-width: 200px;
+  max-width: 340px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  border-radius: 7px;
+  padding: 8px 12px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.results-type-filters {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.results-type-filters .badge {
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+
+.badge-off {
+  opacity: 0.4;
+}
+
+/* Download menu */
+.results-download {
+  position: relative;
+  display: inline-block;
+}
+
+.results-download-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  min-width: 96px;
+  background: var(--panel-raised);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.results-download-menu button {
+  padding: 8px 14px;
+  font-size: 13px;
+  text-align: left;
+  background: none;
+  border: none;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.results-download-menu button:hover {
+  background: var(--panel);
+}
+
+/* Coverage bar (matching) */
+.coverage-bar {
+  width: 120px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--border);
+  overflow: hidden;
+  margin-top: 6px;
+}
+
+.coverage-bar > span {
+  display: block;
+  height: 100%;
+}

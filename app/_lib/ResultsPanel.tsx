@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { StatRail } from "./StatRail";
+import { rowMatchesQuery, rowTypeKey, type RowTypeKey } from "./rowFilter";
 
 export type ResultRow = Record<string, unknown>;
 
@@ -61,6 +63,9 @@ function triggerDownload(rows: ResultRow[], columns: string[], format: "json" | 
 
 export function ResultsPanel({ rows, report, entityLabel, badgeColumn, downloadBaseName, onRowClick }: ResultsPanelProps) {
   const [showAllColumns, setShowAllColumns] = useState(false);
+  const [query, setQuery] = useState("");
+  const [activeTypes, setActiveTypes] = useState<Set<RowTypeKey>>(new Set());
+  const [downloadOpen, setDownloadOpen] = useState(false);
 
   const allColumns = Array.from(
     rows.reduce((set, row) => {
@@ -79,49 +84,121 @@ export function ResultsPanel({ rows, report, entityLabel, badgeColumn, downloadB
   const hiddenCount = allColumns.length - populatedColumns.length;
   const badgeCol = columns.find((c) => c.toLowerCase() === badgeColumn.toLowerCase());
 
+  const typeCounts = rows.reduce<Record<RowTypeKey, number>>(
+    (acc, r) => {
+      const k = rowTypeKey(badgeCol ? r[badgeCol] : undefined);
+      acc[k] = (acc[k] ?? 0) + 1;
+      return acc;
+    },
+    { SV: 0, INT: 0, NON: 0, other: 0 }
+  );
+  const typeFilters: RowTypeKey[] = (["SV", "INT", "NON", "other"] as RowTypeKey[]).filter((k) => typeCounts[k] > 0);
+  const showTypeFilters = !!badgeCol && typeFilters.length > 1;
+
+  const visibleRows = rows.filter((r) => {
+    if (showTypeFilters && activeTypes.size > 0 && !activeTypes.has(rowTypeKey(badgeCol ? r[badgeCol] : undefined))) {
+      return false;
+    }
+    return rowMatchesQuery(r, query);
+  });
+
   const reportEntries = Object.entries(report ?? {});
   const scalarStats = reportEntries.filter(
     ([, v]) => v === null || ["string", "number", "boolean"].includes(typeof v)
   );
   const nestedReport = Object.fromEntries(reportEntries.filter(([k]) => !scalarStats.some(([sk]) => sk === k)));
 
+  function toggleType(k: RowTypeKey) {
+    setActiveTypes((prev) => {
+      const next = new Set(prev);
+      if (next.has(k)) next.delete(k);
+      else next.add(k);
+      return next;
+    });
+  }
+
   return (
     <>
       {scalarStats.length > 0 && (
-        <div className="stats">
-          {scalarStats.map(([key, value]) => (
-            <div className="stat" key={key}>
-              <div className="stat-label">{key.replace(/_/g, " ")}</div>
-              <div className="stat-value">{String(value)}</div>
-            </div>
-          ))}
-        </div>
+        <StatRail
+          stats={scalarStats.map(([key, value]) => ({
+            label: key.replace(/_/g, " "),
+            value: String(value),
+          }))}
+        />
       )}
 
       {Object.keys(nestedReport).length > 0 && (
         <details className="report-details">
-          <summary>Full report</summary>
+          <summary>Relatório completo</summary>
           <pre>{JSON.stringify(nestedReport, null, 2)}</pre>
         </details>
       )}
 
       <div className="results-header">
         <h2>
-          {entityLabel} — {rows.length} events
+          {entityLabel} — {visibleRows.length}
+          {visibleRows.length !== rows.length ? ` de ${rows.length}` : ""} eventos
         </h2>
         <div className="results-actions">
           {hasHiddenColumns && (
             <button className="btn btn-ghost" onClick={() => setShowAllColumns((s) => !s)}>
-              {showAllColumns ? "Hide empty columns" : `Show all columns (+${hiddenCount})`}
+              {showAllColumns ? "Ocultar colunas vazias" : `Mostrar todas as colunas (+${hiddenCount})`}
             </button>
           )}
-          <button className="btn btn-ghost" onClick={() => triggerDownload(rows, allColumns, "json", downloadBaseName)}>
-            Download JSON
-          </button>
-          <button className="btn btn-ghost" onClick={() => triggerDownload(rows, allColumns, "csv", downloadBaseName)}>
-            Download CSV
-          </button>
+          <div className="results-download">
+            <button className="btn btn-ghost" onClick={() => setDownloadOpen((o) => !o)}>
+              Baixar ▾
+            </button>
+            {downloadOpen && (
+              <div className="results-download-menu">
+                <button
+                  onClick={() => {
+                    triggerDownload(rows, allColumns, "json", downloadBaseName);
+                    setDownloadOpen(false);
+                  }}
+                >
+                  JSON
+                </button>
+                <button
+                  onClick={() => {
+                    triggerDownload(rows, allColumns, "csv", downloadBaseName);
+                    setDownloadOpen(false);
+                  }}
+                >
+                  CSV
+                </button>
+              </div>
+            )}
+          </div>
         </div>
+      </div>
+
+      <div className="results-filters">
+        <input
+          className="results-search"
+          placeholder="Buscar…"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          aria-label="Buscar nos resultados"
+        />
+        {showTypeFilters && (
+          <div className="results-type-filters">
+            {typeFilters.map((k) => (
+              <button
+                key={k}
+                className={`badge ${k === "SV" ? "badge-sv" : k === "INT" ? "badge-int" : k === "NON" ? "badge-nonint" : "badge-other"}${
+                  activeTypes.size > 0 && !activeTypes.has(k) ? " badge-off" : ""
+                }`}
+                onClick={() => toggleType(k)}
+                aria-pressed={activeTypes.has(k)}
+              >
+                <span className="dot" />
+                {k} {typeCounts[k]}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="spec-table-wrap">
@@ -134,7 +211,7 @@ export function ResultsPanel({ rows, report, entityLabel, badgeColumn, downloadB
             </tr>
           </thead>
           <tbody>
-            {rows.map((row, i) => (
+            {visibleRows.map((row, i) => (
               <tr
                 key={i}
                 className={onRowClick ? "row-clickable" : undefined}
