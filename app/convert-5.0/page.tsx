@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { badgeClass, badgeLabel } from "../_lib/ResultsPanel";
-import { takeSpecHandoff } from "../_lib/specHandoff";
+import { loadSession } from "../_lib/sessionStore";
 import { ConvertCard } from "./ConvertCard";
 import { CONTEXT_FIELDS, ENUMS, validate, toBlock, withProductDisambiguation, type ConvEvent } from "./taxonomy5";
 
@@ -53,6 +53,7 @@ export default function ConvertTaxonomyPage() {
   const [convertError, setConvertError] = useState<string | null>(null);
   const [productJourney, setProductJourney] = useState(false);
   const [fromHandoff, setFromHandoff] = useState(false);
+  const [sessionFileName, setSessionFileName] = useState<string | null>(null);
 
   async function runConvert(rows: unknown[], viaHandoff = false) {
     setConverting(true);
@@ -69,13 +70,21 @@ export default function ConvertTaxonomyPage() {
     }
   }
 
-  // Convert the handed-off spec once on mount. Setting the loading state on
+  // Convert the session spec once on mount. Setting the loading state on
   // mount is intentional here (a fetch-on-mount), so the cascading-render
   // warning is explicitly accepted rather than worked around.
   useEffect(() => {
-    const rows = takeSpecHandoff();
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (rows && rows.length > 0) runConvert(rows, true);
+    let cancelled = false;
+    void loadSession().then(({ map }) => {
+      if (cancelled || !map || map.spec.length === 0) return;
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setSessionFileName(map.fileName);
+      void runConvert(map.spec, true);
+    });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function handleFileChange(selected: File | null) {
@@ -163,7 +172,9 @@ export default function ConvertTaxonomyPage() {
       )}
 
       {fromHandoff && events && (
-        <p className="handoff-banner">Spec carregado da Extração de Mapa · {events.length} eventos.</p>
+        <p className="handoff-banner">
+          Spec do mapa da sessão{sessionFileName ? ` · ${sessionFileName}` : ""} · {events.length} eventos.
+        </p>
       )}
 
       {convertError && <p className="alert-error">Couldn&apos;t convert: {convertError}</p>}
