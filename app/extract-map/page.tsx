@@ -31,12 +31,15 @@ export default function ExtractMapPage() {
   const [view, setView] = useState<View>("map");
   const meta = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
   const hadSessionMap = useRef(false);
+  // Set when the user starts a new upload; stops a slow hydration from
+  // overwriting the in-flight extraction with the stale session map.
+  const skipHydration = useRef(false);
 
   // Hydrate from the tab session on mount.
   useEffect(() => {
     let cancelled = false;
     void loadSession().then(({ map }) => {
-      if (cancelled || !map) return;
+      if (cancelled || skipHydration.current || !map) return;
       setSvgContent(map.svgText);
       setFileName(map.fileName);
       setResult({ ok: true, spec: map.spec, report: map.report });
@@ -64,6 +67,7 @@ export default function ExtractMapPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!file) return;
+    skipHydration.current = true;
     setLoading(true);
     setResult(null);
     setView("map");
@@ -141,7 +145,7 @@ export default function ExtractMapPage() {
           rows={result.spec}
           svgContent={svgContent}
           onChange={(newRows) => {
-            setResult({ ...result, spec: newRows });
+            setResult((prev) => (prev && prev.ok ? { ...prev, spec: newRows } : prev));
             void updateMapSpec(newRows);
           }}
           onExit={() => setView("map")}
