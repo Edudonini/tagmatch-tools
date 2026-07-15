@@ -1,8 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { ResultsPanel } from "../_lib/ResultsPanel";
+import {
+  getServerSnapshot,
+  getSnapshot,
+  loadSession,
+  saveLogs,
+  subscribe,
+} from "../_lib/sessionStore";
 
 type ExtractLogsResult =
   | { ok: true; logs: Record<string, unknown>[]; report: Record<string, unknown> }
@@ -21,9 +28,41 @@ export default function ExtractLogsPage() {
   const [result, setResult] = useState<ExtractLogsResult | null>(null);
   const [loading, setLoading] = useState(false);
 
+  // Names of the files behind a session-restored result (no File objects exist then).
+  const [restoredFiles, setRestoredFiles] = useState<string[] | null>(null);
+  const meta = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+  const hadSessionLogs = useRef(false);
+  const skipHydration = useRef(false);
+
+  // Hydrate from the tab session on mount.
+  useEffect(() => {
+    let cancelled = false;
+    void loadSession().then(({ logs }) => {
+      if (cancelled || skipHydration.current || !logs) return;
+      setResult({ ok: true, logs: logs.logs, report: logs.report });
+      setRestoredFiles(logs.fileNames);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // When the session logs are cleared (✕ in the bar), drop the page state too.
+  useEffect(() => {
+    if (meta.logs) {
+      hadSessionLogs.current = true;
+    } else if (hadSessionLogs.current) {
+      hadSessionLogs.current = false;
+      setResult(null);
+      setRestoredFiles(null);
+      setFiles([]);
+    }
+  }, [meta.logs]);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (files.length === 0) return;
+    skipHydration.current = true;
     setLoading(true);
     setResult(null);
     const formData = new FormData();
@@ -34,6 +73,14 @@ export default function ExtractLogsPage() {
       const res = await fetch("/api/extract-logs", { method: "POST", body: formData });
       const data: ExtractLogsResult = await res.json();
       setResult(data);
+      if (data.ok) {
+        setRestoredFiles(null);
+        void saveLogs({
+          logs: data.logs,
+          report: data.report,
+          fileNames: files.map((f) => f.name),
+        });
+      }
     } catch (err) {
       setResult({
         ok: false,
@@ -72,7 +119,7 @@ export default function ExtractLogsPage() {
         </label>
         <span className="file-name">
           {files.length === 0
-            ? "No files chosen"
+            ? (restoredFiles ? restoredFiles.join(", ") : "No files chosen")
             : files.length === 1
               ? files[0].name
               : `${files.length} files`}
@@ -94,6 +141,12 @@ export default function ExtractLogsPage() {
           {loading ? "Extracting…" : "Extract →"}
         </button>
       </form>
+
+      {restoredFiles && result && result.ok && (
+        <p className="handoff-banner">
+          Logs da sessão · {restoredFiles.join(", ")} · {result.logs.length} eventos.
+        </p>
+      )}
 
       {result && !result.ok && (
         <p className="alert-error">Couldn&apos;t extract logs: {result.error}</p>
