@@ -1366,6 +1366,11 @@ tbody tr:hover {
   gap: 12px;
 }
 
+.c5-screen-panel {
+  display: flex;
+  flex-direction: column;
+}
+
 .c5-screen-frame {
   display: block;
   width: 100%;
