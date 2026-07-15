@@ -952,6 +952,16 @@ tbody tr:hover {
   cursor: pointer;
 }
 
+.convert5-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
 .convert5-footer {
   display: flex;
   align-items: center;

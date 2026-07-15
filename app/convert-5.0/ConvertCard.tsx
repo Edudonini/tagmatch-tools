@@ -1,7 +1,7 @@
 "use client";
 
 import { badgeClass, badgeLabel } from "../_lib/ResultsPanel";
-import { ENUMS, activeFields, isKnownField, isRawField, normalize, toBlock, validate, withToggles, type ConvEvent, type ConvField } from "./taxonomy5";
+import { ENUMS, activeFields, isKnownField, isPlaceholder, isRawField, normalize, toBlock, validate, withToggles, type ConvEvent, type ConvField } from "./taxonomy5";
 
 type ConvertCardProps = {
   event: ConvEvent;
@@ -24,7 +24,7 @@ export function ConvertCard({ event, onChange }: ConvertCardProps) {
     // matching validate()'s exemption; only known free-text fields are snaked.
     if (isRawField(key) || !isKnownField(key)) return;
     const cur = event.fields[key]?.value ?? "";
-    if (/^\[.*\]$/.test(cur.trim())) return; // dynamic placeholder, e.g. [nome_do_plano]
+    if (isPlaceholder(cur)) return; // dynamic placeholder, e.g. [nome_do_plano]
     const n = normalize(cur);
     if (n !== cur) updateField(key, n);
   }
@@ -60,7 +60,7 @@ export function ConvertCard({ event, onChange }: ConvertCardProps) {
             <div className="convert5-field-row" key={key}>
               <label className="review-field-label convert5-field-label">
                 {key}
-                {ENUMS[key] ? (
+                {ENUMS[key] && !isPlaceholder(field.value) ? (
                   <select
                     className="review-field-input"
                     value={field.value}
