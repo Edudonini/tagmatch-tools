@@ -46,6 +46,11 @@ const SNAKE_RE = /^[a-z0-9_]+$/;
 const PATH_RE = /^\/[a-z0-9-]+(\/[a-z0-9-]+)*\/?$/;
 const PLACEHOLDER_RE = /^\[.*\]$/; // dynamic value filled in the metrics map, e.g. [nome_do_plano]
 
+// A `[...]` value the analyst leaves for the metrics map (not normalized/validated/enum-rendered).
+export function isPlaceholder(value: string): boolean {
+  return PLACEHOLDER_RE.test(value.trim());
+}
+
 const KNOWN_FIELDS: readonly string[] = [
   ...BASE_FIELDS, ...COMPONENT_FIELDS, ...ERROR_FIELDS, ...PRODUCT_FIELDS,
 ];
