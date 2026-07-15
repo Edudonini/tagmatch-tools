@@ -211,7 +211,7 @@ export function MapView({ rows, report, onReview }: MapViewProps) {
                     </button>
                     {isOpen && (
                       <button className="mv-copy" onClick={() => copyEvent(row)} aria-label="Copiar parâmetros do evento">
-                        Copy
+                        Copiar
                       </button>
                     )}
                   </div>

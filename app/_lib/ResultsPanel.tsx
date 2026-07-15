@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { StatRail } from "./StatRail";
 import { rowMatchesQuery, rowTypeKey, type RowTypeKey } from "./rowFilter";
 
@@ -66,6 +66,29 @@ export function ResultsPanel({ rows, report, entityLabel, badgeColumn, downloadB
   const [query, setQuery] = useState("");
   const [activeTypes, setActiveTypes] = useState<Set<RowTypeKey>>(new Set());
   const [downloadOpen, setDownloadOpen] = useState(false);
+  const downloadRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!downloadOpen) return;
+
+    function handlePointerDown(e: PointerEvent) {
+      if (downloadRef.current && !downloadRef.current.contains(e.target as Node)) {
+        setDownloadOpen(false);
+      }
+    }
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        setDownloadOpen(false);
+      }
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [downloadOpen]);
 
   const allColumns = Array.from(
     rows.reduce((set, row) => {
@@ -146,8 +169,8 @@ export function ResultsPanel({ rows, report, entityLabel, badgeColumn, downloadB
               {showAllColumns ? "Ocultar colunas vazias" : `Mostrar todas as colunas (+${hiddenCount})`}
             </button>
           )}
-          <div className="results-download">
-            <button className="btn btn-ghost" onClick={() => setDownloadOpen((o) => !o)}>
+          <div className="results-download" ref={downloadRef}>
+            <button className="btn btn-ghost" aria-expanded={downloadOpen} onClick={() => setDownloadOpen((o) => !o)}>
               Baixar ▾
             </button>
             {downloadOpen && (

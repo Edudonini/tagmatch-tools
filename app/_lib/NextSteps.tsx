@@ -22,7 +22,7 @@ export function NextSteps({ tool }: { tool: "extract-map" | "extract-logs" }) {
             </Link>
             {step.hint && step.hintHref && (
               <Link href={step.hintHref} className="next-step-hint">
-                {step.hint} →
+                {step.hint}
               </Link>
             )}
           </div>
