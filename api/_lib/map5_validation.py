@@ -259,16 +259,21 @@ def validate_events(events):
         findings = []
         _validate_one(event_type, event_order, params, findings, open_questions)
         all_findings.extend(findings)
-        reds = sum(1 for f in findings if f["severity"] == "red")
-        ambers = sum(1 for f in findings if f["severity"] == "amber")
-        verdict = "red" if reds else ("amber" if ambers else "green")
+        verdict = ("red" if any(f["severity"] == "red" for f in findings)
+                   else "amber" if any(f["severity"] == "amber" for f in findings) else "green")
+        fields = _event_fields(event_type, params, findings)
+        # Count the rendered rows (worst-severity-per-field), not raw findings, so the
+        # header tally always matches what the DA sees in the card body.
         report_events.append({
             "event_type": event_type,
             "event_order": event_order,
             "screen": params.get("screenName") or params.get("sn") or "",
             "verdict": verdict,
-            "counts": {"red": reds, "amber": ambers},
-            "fields": _event_fields(event_type, params, findings),
+            "counts": {
+                "red": sum(1 for r in fields if r["status"] in ("red", "missing")),
+                "amber": sum(1 for r in fields if r["status"] == "amber"),
+            },
+            "fields": fields,
         })
 
     total = len(report_events)
