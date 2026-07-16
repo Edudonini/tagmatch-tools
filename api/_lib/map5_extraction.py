@@ -18,8 +18,13 @@ _KNOWN_FIELDS = [
     "crm_name", "payment_method", "info_detail", "description", "value",
     "event", "name", "sn", "ct", "ac", "lb",
 ]
-_SORTED = sorted(set(_KNOWN_FIELDS), key=len, reverse=True)
+# dedup preserving first-seen order, then stable-sort longest-first, so the
+# boundary precedence is deterministic even between same-length field names.
+_SORTED = sorted(dict.fromkeys(_KNOWN_FIELDS), key=len, reverse=True)
 _FIELD_RE = re.compile(r"(?i)(" + "|".join(re.escape(f) for f in _SORTED) + r")\s*[:=]")
+# Deliberately no `\b` before the alternation: on merged cards a field name is
+# glued directly to the previous value with no boundary (e.g. `comercialmacro_journey=`),
+# so a word boundary would miss exactly the merges this re-parser exists to split.
 
 
 def split_params(text):
@@ -28,7 +33,10 @@ def split_params(text):
     markers = []
     for m in _FIELD_RE.finditer(text):
         pre = text[:m.start()]
-        # a field marker inside an open `[...]` placeholder is part of a value, not a boundary
+        # A field marker inside an open `[...]` placeholder is part of a value, not a
+        # boundary. A stray `]` yields a negative depth (still <= 0 → treated as a
+        # boundary, correct). An unmatched `[` leaves depth > 0 and swallows the rest of
+        # the card into the current value — a malformed card the Phase-2 validator flags.
         if pre.count("[") - pre.count("]") <= 0:
             markers.append((m.start(), m.end(), m.group(1)))
     out = {}

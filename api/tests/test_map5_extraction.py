@@ -52,6 +52,18 @@ def test_split_keeps_field_name_inside_placeholder_as_value():
     assert p["origin_nv"] == "home"
 
 
+def test_split_ignores_field_marker_inside_placeholder():
+    # a `field:`/`field=` token INSIDE `[...]` is part of the value, not a boundary —
+    # the bracket-depth filter must suppress it (a real `:`/`=` inside the brackets,
+    # unlike the `|`-only option lists above).
+    # `event:` and `value=` are real known fields, here nested inside the placeholder.
+    p = split_params("info_detail:[event:x,value=y]\ndepartment:comercial")
+    assert p["info_detail"] == "[event:x,value=y]"
+    assert p["department"] == "comercial"
+    assert "event" not in p  # the inner `event:` did not open a new field
+    assert "value" not in p  # the inner `value=` did not open a new field
+
+
 def test_split_longest_name_precedence():
     p = split_params("event_detail:clique_x\nevent:interaction")
     assert p["event_detail"] == "clique_x"
