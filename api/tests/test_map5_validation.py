@@ -151,3 +151,37 @@ def test_endpoint_bad_svg_is_400_not_500():
     data = {"file": (io.BytesIO(b"not an svg"), "x.svg")}
     r = _endpoint_client().post("/api/validate-5.0", data=data, content_type="multipart/form-data")
     assert r.status_code == 400
+
+
+def test_component_type_alert_is_valid_no_enum_finding():
+    p = dict(_GOOD_SV, event="interaction", component_type="alert", component_copy="[texto]")
+    r = validate_events([_ev("interaction", **p)])
+    assert not any(f["category"] == "enum" and f["field"] == "component_type" for f in r["findings"])
+    assert r["summary"]["green"] == 1 and r["summary"]["red"] == 0 and r["summary"]["amber"] == 0
+
+
+def test_component_type_invalid_value_is_red_enum():
+    p = dict(_GOOD_SV, event="interaction", component_type="foo", component_copy="[texto]")
+    r = validate_events([_ev("interaction", **p)])
+    assert any(f["category"] == "enum" and f["field"] == "component_type" and f["severity"] == "red"
+               for f in r["findings"])
+
+
+def test_product_context_missing_event_plan_type_is_amber_conditional():
+    p = dict(_GOOD_SV, plan_name="controle_top")
+    r = validate_events([_ev("screen_view", **p)])
+    assert any(f["category"] == "conditional" and f["severity"] == "amber" for f in r["findings"])
+
+
+def test_screen_name_not_starting_with_slash_is_amber_nomenclature():
+    p = dict(_GOOD_SV, screenName="hub/x")
+    r = validate_events([_ev("screen_view", **p)])
+    assert any(f["category"] == "nomenclature" and f["field"] == "screenName" and f["severity"] == "amber"
+               for f in r["findings"])
+
+
+def test_fixed_passthrough_field_is_not_checked_for_nomenclature():
+    p = dict(_GOOD_SV, title="Inserir Cartao")
+    r = validate_events([_ev("screen_view", **p)])
+    assert not any(f["category"] == "nomenclature" and f["field"] == "title" for f in r["findings"])
+    assert r["summary"]["green"] == 1 and r["summary"]["red"] == 0 and r["summary"]["amber"] == 0

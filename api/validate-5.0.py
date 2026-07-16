@@ -25,6 +25,6 @@ def handle_validate_5_0():
     try:
         events = reparse_5_0(base["spec"])
         validation = validate_events(events)
-    except ValueError as e:
+    except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 400
     return jsonify({"ok": True, "events": events, "validation": validation}), 200

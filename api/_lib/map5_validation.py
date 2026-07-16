@@ -8,6 +8,11 @@ open_questions (they never affect a verdict). No I/O, no LLM.
 import re
 import unicodedata
 
+from .taxonomy5 import (
+    EVENT_KINDS, EVENT_ACCESS_TYPE, CLIENT_CATEGORY, STATUS_JOURNEY,
+    COMPONENT_TYPE, ERROR_STATUS, ERROR_TYPE, EVENT_PLAN_TYPE,
+)
+
 # --- Reference standard (App 5.0 taxonomy / techlead QA prompt) ---
 
 _REQUIRED_BASE = [
@@ -21,14 +26,14 @@ REQUIRED_FIELDS = {
 }
 
 ENUMS = {
-    "event": ["screen_view", "interaction", "noninteraction"],
-    "event_access_type": ["vivo", "b2c", "b2b_m", "b2b_c"],
-    "client_category": ["adm_prin", "adm", "tec", "cob", "soc", "b2c_not_apply", "vivo_not_apply"],
-    "status_journey": ["intencao", "sucesso", "erro", "progresso", "excecao"],
-    "component_type": ["button", "link", "card", "modal", "toggle", "checkbox", "banner", "video", "dropdown"],
-    "error_status": ["bloqueado", "continuar"],
-    "error_type": ["usuario", "negocio", "aplicativo"],
-    "event_plan_type": ["pre", "pos", "controle", "fixa", "easy", "movel_corporativo", "fixo_corporativo"],
+    "event": list(EVENT_KINDS),
+    "event_access_type": list(EVENT_ACCESS_TYPE),
+    "client_category": list(CLIENT_CATEGORY),
+    "status_journey": list(STATUS_JOURNEY),
+    "component_type": list(COMPONENT_TYPE),
+    "error_status": list(ERROR_STATUS),
+    "error_type": list(ERROR_TYPE),
+    "event_plan_type": list(EVENT_PLAN_TYPE),
 }
 
 LEGACY_FIELDS = ["name", "sn", "ct", "ac", "lb", "eventCategory", "eventAction", "eventLabel"]
@@ -41,8 +46,8 @@ _LEGACY_MIGRATION = {
 ERROR_FIELDS = ["error_status", "error_type", "error_code"]
 PRODUCT_FIELDS = ["plan_name", "event_plan_type"]
 
-# Free-text / path fields exempt from snake_case (display text or kebab path).
-_NOMENCLATURE_EXEMPT = {"screenName", "component_copy"}
+# Free-form snake_case fields the nomenclature standard actually governs.
+_NOMENCLATURE_CHECK_FIELDS = ("department", "macro_journey", "micro_journey", "event_detail")
 
 # --- Dynamic value detection ---
 _VAR_RE = re.compile(r"\{\{.*?\}\}|\[.*?\]|<.*?>|\$\w+|%[sd]")
@@ -153,14 +158,10 @@ def _validate_one(event_type, event_order, params, findings, open_questions):
             add(field, "valor(es) fora do enum: " + ", ".join(bad), "red", "enum",
                 "permitidos: " + " | ".join(allowed))
 
-    # 4. Nomenclature (open fields only; enums handled above; display/path exempt; dynamic exempt)
-    for field, raw in params.items():
-        value = _s(raw)
-        if not value or field in ENUMS or field in LEGACY_FIELDS or field in _NOMENCLATURE_EXEMPT:
-            continue
-        if field == "screenName":
-            continue
-        if is_dynamic(value):
+    # 4. Nomenclature (only the free-form snake_case fields the standard governs)
+    for field in _NOMENCLATURE_CHECK_FIELDS:
+        value = _s(params.get(field))
+        if not value or is_dynamic(value):
             continue
         prob = _nomenclature_problem(value)
         if prob:
