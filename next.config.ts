@@ -14,6 +14,7 @@ const nextConfig: NextConfig = {
         { source: "/api/build-query", destination: "http://127.0.0.1:5328/api/build-query" },
         { source: "/api/match", destination: "http://127.0.0.1:5328/api/match" },
         { source: "/api/convert-taxonomy", destination: "http://127.0.0.1:5328/api/convert-taxonomy" },
+        { source: "/api/extract-5.0", destination: "http://127.0.0.1:5328/api/extract-5.0" },
       ];
     }
     return always;
