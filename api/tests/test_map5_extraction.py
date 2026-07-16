@@ -35,7 +35,7 @@ def test_split_unmerges_all_fields():
     # colon+equals mixed pairs split too
     assert p["error_type"] == "[usuario|negocio|aplicativo]"
     assert p["error_status"] == "[bloqueado|continue]"
-    assert p["journeyvariant"] == "[jornadaDeOrigem]"
+    assert p["journeyVariant"] == "[jornadaDeOrigem]"  # canonical casing, even though raw was lowercased
     assert p["crm_name"] == "[nomeDaBase]"
     assert p["plan_name"] == "[nomeDoPlano]"
     assert p["event_plan_type"] == "[tipoDoPlano]"
@@ -62,6 +62,15 @@ def test_split_ignores_field_marker_inside_placeholder():
     assert p["department"] == "comercial"
     assert "event" not in p  # the inner `event:` did not open a new field
     assert "value" not in p  # the inner `value=` did not open a new field
+
+
+def test_split_emits_canonical_field_casing():
+    # keys carry the taxonomy's canonical casing even when the raw card lowercased them —
+    # the tool header reads params.screenName directly, so this contract must hold.
+    p = split_params("screenname:/hub-payment/insert-card\njourneyvariant:[jornada]")
+    assert p["screenName"] == "/hub-payment/insert-card"
+    assert p["journeyVariant"] == "[jornada]"
+    assert "screenname" not in p and "journeyvariant" not in p
 
 
 def test_split_longest_name_precedence():

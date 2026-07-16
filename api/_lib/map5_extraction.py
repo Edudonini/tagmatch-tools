@@ -25,6 +25,10 @@ _FIELD_RE = re.compile(r"(?i)(" + "|".join(re.escape(f) for f in _SORTED) + r")\
 # Deliberately no `\b` before the alternation: on merged cards a field name is
 # glued directly to the previous value with no boundary (e.g. `comercialmacro_journey=`),
 # so a word boundary would miss exactly the merges this re-parser exists to split.
+# Map each matched token (matched case-insensitively, and the base parser may have
+# lowercased it) back to the canonical field name, so keys keep their taxonomy casing
+# (`screenName`, `journeyVariant`) for display and downstream field/enum matching.
+_CANONICAL = {f.lower(): f for f in _KNOWN_FIELDS}
 
 
 def split_params(text):
@@ -42,7 +46,7 @@ def split_params(text):
     out = {}
     for i, (start, end, name) in enumerate(markers):
         value_end = markers[i + 1][0] if i + 1 < len(markers) else len(text)
-        key = name.lower()
+        key = _CANONICAL.get(name.lower(), name.lower())
         if key not in out:  # first occurrence wins
             out[key] = text[end:value_end].strip()
     return out
