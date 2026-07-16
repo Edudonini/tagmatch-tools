@@ -49,7 +49,10 @@ export default function Validate5Page() {
   const events = useMemo(() => result?.events ?? [], [result]);
   const problemCount = useMemo(() => events.filter((e) => e.verdict !== "green").length, [events]);
   const shown = useMemo(
-    () => events.filter((e) => !onlyProblems || e.verdict !== "green"),
+    () =>
+      events
+        .map((e, i) => [e, i] as const) // keep the stable full-array index for React keys
+        .filter(([e]) => !onlyProblems || e.verdict !== "green"),
     [events, onlyProblems],
   );
 
@@ -102,7 +105,7 @@ export default function Validate5Page() {
             </div>
 
             <div className="report-cards">
-              {shown.map((e, i) => (
+              {shown.map(([e, i]) => (
                 <EventReportCard key={`${String(e.event_order ?? "?")}-${i}`} event={e} />
               ))}
             </div>
