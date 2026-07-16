@@ -109,7 +109,7 @@ def _nomenclature_problem(value):
     return ""
 
 
-def _finding(params, event_type, event_order, field, problem, severity, category, suggestion=""):
+def _finding(params, event_type, event_order, field, problem, severity, category, suggestion="", reason=""):
     return {
         "screen": params.get("screenName") or params.get("sn") or "",
         "event_type": event_type,
@@ -119,27 +119,31 @@ def _finding(params, event_type, event_order, field, problem, severity, category
         "severity": severity,
         "category": category,
         "suggestion": suggestion,
+        "reason": reason,
     }
 
 
 def _validate_one(event_type, event_order, params, findings, open_questions):
-    def add(field, problem, severity, category, suggestion=""):
-        findings.append(_finding(params, event_type, event_order, field, problem, severity, category, suggestion))
+    def add(field, problem, severity, category, suggestion="", reason=""):
+        findings.append(_finding(params, event_type, event_order, field, problem, severity, category, suggestion, reason))
 
     # 1. Completeness (only for the three standard 5.0 event kinds)
     required = REQUIRED_FIELDS.get(event_type)
     if required:
         for f in required:
             if not _s(params.get(f)):
-                add(f, "campo obrigatório ausente", "red", "completeness", "preencher o campo obrigatório")
+                add(f, "campo obrigatório ausente", "red", "completeness",
+                    "preencher o campo obrigatório", reason="obrigatório no padrão 5.0")
 
     # 2. Legacy fields + napp in screenName
     for lf in LEGACY_FIELDS:
         if _s(params.get(lf)):
+            target = _LEGACY_MIGRATION.get(lf, "campo 5.0 correspondente")
             add(lf, "campo legado descontinuado", "red", "legacy",
-                f"migrar {lf} → {_LEGACY_MIGRATION.get(lf, 'campo 5.0 correspondente')}")
+                f"migrar {lf} → {target}", reason=f"campo legado — migrar para {target}")
     if "napp" in _s(params.get("screenName")).lower():
-        add("screenName", "screenName usa 'napp' (descontinuado)", "red", "legacy", "remover 'napp' do screenName")
+        add("screenName", "screenName usa 'napp' (descontinuado)", "red", "legacy",
+            "remover 'napp' do screenName", reason="remover 'napp' do screenName")
 
     # 3. Enums + dynamic-vs-fixed for event
     for field, allowed in ENUMS.items():
@@ -148,15 +152,16 @@ def _validate_one(event_type, event_order, params, findings, open_questions):
             continue
         if field == "event" and is_dynamic(raw):
             add("event", "event não pode ser dinâmico (deve ser fixo)", "red", "dynamic_fixed",
-                "usar valor fixo: " + " | ".join(allowed))
+                "usar valor fixo: " + " | ".join(allowed), reason="deve ser fixo, não dinâmico")
             continue
         tokens = _enum_tokens(raw)
         if tokens is None:
-            continue  # un-inferable runtime var → handled as open_question below
+            continue
         bad = [t for t in tokens if t not in allowed]
         if bad:
             add(field, "valor(es) fora do enum: " + ", ".join(bad), "red", "enum",
-                "permitidos: " + " | ".join(allowed))
+                "permitidos: " + " | ".join(allowed),
+                reason="fora do enum · permitidos: " + ", ".join(allowed))
 
     # 4. Nomenclature (only the free-form snake_case fields the standard governs)
     for field in _NOMENCLATURE_CHECK_FIELDS:
@@ -166,28 +171,30 @@ def _validate_one(event_type, event_order, params, findings, open_questions):
         prob = _nomenclature_problem(value)
         if prob:
             add(field, f"nomenclatura: {prob}", "amber", "nomenclature",
-                "usar snake_case, sem acento/caractere especial")
+                "usar snake_case, sem acento/caractere especial",
+                reason="usar snake_case, sem acento/caractere especial")
     if _s(params.get("screenName")) and not _s(params.get("screenName")).startswith("/"):
-        add("screenName", "screenName deve começar com '/'", "amber", "nomenclature", "prefixar com '/'")
+        add("screenName", "screenName deve começar com '/'", "amber", "nomenclature",
+            "prefixar com '/'", reason='deve começar com "/" (sem napp)')
 
-    # 5. Conditionals (error / product)
+    # 5. Conditionals (error / product) — one finding per missing field
     sj = _s(params.get("status_journey")).lower()
     if "erro" in sj or any(_s(params.get(f)) for f in ERROR_FIELDS):
-        missing = [f for f in ERROR_FIELDS if not _s(params.get(f))]
-        if missing:
-            add(", ".join(missing), "contexto de erro mas faltam: " + ", ".join(missing),
-                "amber", "conditional", "preencher os campos error_*")
+        for f in ERROR_FIELDS:
+            if not _s(params.get(f)):
+                add(f, "campo de erro ausente", "amber", "conditional",
+                    "preencher os campos error_*", reason="obrigatório quando há erro")
     if any(_s(params.get(f)) for f in PRODUCT_FIELDS):
-        missing = [f for f in PRODUCT_FIELDS if not _s(params.get(f))]
-        if missing:
-            add(", ".join(missing), "contexto de produto mas faltam: " + ", ".join(missing),
-                "amber", "conditional", "preencher plan_name e event_plan_type")
+        for f in PRODUCT_FIELDS:
+            if not _s(params.get(f)):
+                add(f, "campo de produto ausente", "amber", "conditional",
+                    "preencher plan_name e event_plan_type", reason="obrigatório quando há produto")
 
     # 6. event_detail format
     ed = _s(params.get("event_detail"))
     if ed and not is_dynamic(ed) and "_" not in ed:
         add("event_detail", "event_detail deve seguir [acao]_[descricao]", "amber", "event_detail_format",
-            "ex.: clique_confirmar_recarga")
+            "ex.: clique_confirmar_recarga", reason="usar formato [acao]_[descricao]")
 
     # Open questions: closed-enum fields whose dynamic value can't be inferred
     for field in ENUMS:
@@ -202,13 +209,47 @@ def _validate_one(event_type, event_order, params, findings, open_questions):
             })
 
 
+def _worst_by_field(findings):
+    """Worst-severity single finding per field (red beats amber)."""
+    by = {}
+    for f in findings:
+        prev = by.get(f["field"])
+        if prev is None or (f["severity"] == "red" and prev["severity"] == "amber"):
+            by[f["field"]] = f
+    return by
+
+
+def _field_row(field, params, finding, required):
+    value = _s(params.get(field))
+    if finding is not None:
+        status = "missing" if finding["category"] == "completeness" else finding["severity"]
+        return {"field": field, "value": value, "status": status, "reason": finding["reason"]}
+    if not value:
+        return {"field": field, "value": "",
+                "status": "missing" if required else "extra",
+                "reason": "obrigatório no padrão 5.0" if required else ""}
+    return {"field": field, "value": value, "status": "ok" if required else "extra", "reason": ""}
+
+
+def _event_fields(event_type, params, findings):
+    by_field = _worst_by_field(findings)
+    rows, seen = [], set()
+    for fld in REQUIRED_FIELDS.get(event_type, []):
+        seen.add(fld)
+        rows.append(_field_row(fld, params, by_field.get(fld), required=True))
+    for fld in list(params) + list(by_field):
+        if fld in seen:
+            continue
+        seen.add(fld)
+        rows.append(_field_row(fld, params, by_field.get(fld), required=False))
+    return rows
+
+
 def validate_events(events):
     """Run the deterministic ruleset over reparse_5_0 events → validation report."""
     if not isinstance(events, list):
         raise ValueError("events must be a list.")
-    all_findings = []
-    open_questions = []
-    verdicts = []
+    all_findings, open_questions, report_events = [], [], []
     for ev in events:
         if not isinstance(ev, dict):
             continue
@@ -218,31 +259,31 @@ def validate_events(events):
         findings = []
         _validate_one(event_type, event_order, params, findings, open_questions)
         all_findings.extend(findings)
-        if any(f["severity"] == "red" for f in findings):
-            verdict = "red"
-        elif any(f["severity"] == "amber" for f in findings):
-            verdict = "amber"
-        else:
-            verdict = "green"
-        verdicts.append((event_type, event_order, params, verdict))
+        reds = sum(1 for f in findings if f["severity"] == "red")
+        ambers = sum(1 for f in findings if f["severity"] == "amber")
+        verdict = "red" if reds else ("amber" if ambers else "green")
+        report_events.append({
+            "event_type": event_type,
+            "event_order": event_order,
+            "screen": params.get("screenName") or params.get("sn") or "",
+            "verdict": verdict,
+            "counts": {"red": reds, "amber": ambers},
+            "fields": _event_fields(event_type, params, findings),
+        })
 
-    total = len(verdicts)
-    red = sum(1 for *_, v in verdicts if v == "red")
-    amber = sum(1 for *_, v in verdicts if v == "amber")
-    green = sum(1 for *_, v in verdicts if v == "green")
-    approved = [
-        {"screen": p.get("screenName") or p.get("sn") or "", "event_type": et, "event_order": eo}
-        for et, eo, p, v in verdicts if v == "green"
-    ]
-    summary = {
-        "total": total, "red": red, "amber": amber, "green": green,
-        "adherence_pct": round(green / total * 100) if total else 0,
-    }
+    total = len(report_events)
+    red = sum(1 for e in report_events if e["verdict"] == "red")
+    amber = sum(1 for e in report_events if e["verdict"] == "amber")
+    green = sum(1 for e in report_events if e["verdict"] == "green")
+    approved = [{"screen": e["screen"], "event_type": e["event_type"], "event_order": e["event_order"]}
+                for e in report_events if e["verdict"] == "green"]
+    summary = {"total": total, "red": red, "amber": amber, "green": green,
+               "adherence_pct": round(green / total * 100) if total else 0}
     if total:
         open_questions.append({
             "screen": "", "field": "coerência semântica",
             "note": ("Verificar manualmente se event_detail, component_copy, component_type, "
                      "macro_journey/micro_journey e status_journey coerem com a tela desenhada."),
         })
-    return {"summary": summary, "findings": all_findings, "approved": approved,
-            "open_questions": open_questions}
+    return {"summary": summary, "events": report_events, "findings": all_findings,
+            "approved": approved, "open_questions": open_questions}

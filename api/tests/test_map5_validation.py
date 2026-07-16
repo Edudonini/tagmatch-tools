@@ -19,6 +19,7 @@ _GOOD_SV = dict(
     event_access_type="[vivo|b2c|b2b_c|b2b_m]", client_category="[adm|tec]",
     department="comercial", macro_journey="hub_pagamentos", micro_journey="inserir_cartao",
     event_detail="visualizacao_inserir_cartao", status_journey="sucesso",
+    info_detail="detalhe_informativo",
 )
 
 
@@ -185,3 +186,73 @@ def test_fixed_passthrough_field_is_not_checked_for_nomenclature():
     r = validate_events([_ev("screen_view", **p)])
     assert not any(f["category"] == "nomenclature" and f["field"] == "title" for f in r["findings"])
     assert r["summary"]["green"] == 1 and r["summary"]["red"] == 0 and r["summary"]["amber"] == 0
+
+
+def _events_of(result):
+    return {(e["event_type"], e["event_order"]): e for e in result["events"]}
+
+
+def _row(event, field):
+    return next((r for r in event["fields"] if r["field"] == field), None)
+
+
+def test_events_green_lists_required_as_ok():
+    r = validate_events([_ev("screen_view", **_GOOD_SV)])
+    ev = r["events"][0]
+    assert ev["verdict"] == "green"
+    # every required screen_view field is present as an ok row
+    for f in ["event", "screenName", "origin_nv", "event_access_type", "client_category",
+              "department", "macro_journey", "micro_journey", "event_detail", "status_journey"]:
+        row = _row(ev, f)
+        assert row is not None and row["status"] == "ok"
+
+
+def test_events_missing_required_row_is_missing_with_reason():
+    p = {k: v for k, v in _GOOD_SV.items() if k != "origin_nv"}
+    r = validate_events([_ev("screen_view", **p)])
+    row = _row(r["events"][0], "origin_nv")
+    assert row["status"] == "missing" and row["value"] == "" and "obrigat" in row["reason"].lower()
+
+
+def test_events_enum_row_shows_bad_value_and_reason():
+    p = dict(_GOOD_SV, event="interaction", component_type="chevron_down", component_copy="[x]")
+    r = validate_events([_ev("interaction", **p)])
+    row = _row(r["events"][0], "component_type")
+    assert row["status"] == "red" and row["value"] == "chevron_down"
+    assert "enum" in row["reason"].lower()
+
+
+def test_events_legacy_sn_is_extra_red_row():
+    p = dict(_GOOD_SV, sn="/napp/old")
+    r = validate_events([_ev("screen_view", **p)])
+    row = _row(r["events"][0], "sn")
+    assert row["status"] == "red" and row["value"] == "/napp/old" and "legado" in row["reason"].lower()
+
+
+def test_events_extra_present_field_is_extra():
+    r = validate_events([_ev("screen_view", **_GOOD_SV)])  # _GOOD_SV has info_detail (not required)
+    row = _row(r["events"][0], "info_detail")
+    assert row is not None and row["status"] == "extra"
+
+
+def test_events_required_rows_come_first():
+    r = validate_events([_ev("screen_view", **_GOOD_SV)])
+    fields = [row["field"] for row in r["events"][0]["fields"]]
+    assert fields[:10] == ["event", "screenName", "origin_nv", "event_access_type", "client_category",
+                           "department", "macro_journey", "micro_journey", "event_detail", "status_journey"]
+
+
+def test_events_conditional_emits_per_field_rows():
+    p = dict(_GOOD_SV, status_journey="erro")
+    r = validate_events([_ev("screen_view", **p)])
+    ev = r["events"][0]
+    for f in ["error_status", "error_type", "error_code"]:
+        row = _row(ev, f)
+        assert row is not None and row["status"] == "amber"
+
+
+def test_events_counts_and_verdict():
+    p = {k: v for k, v in _GOOD_SV.items() if k != "origin_nv"}
+    p["department"] = "comércio"  # amber nomenclature
+    ev = validate_events([_ev("screen_view", **p)])["events"][0]
+    assert ev["verdict"] == "red" and ev["counts"]["red"] >= 1 and ev["counts"]["amber"] >= 1
