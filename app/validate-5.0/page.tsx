@@ -1,16 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Dropzone } from "../_lib/Dropzone";
 import { StatRail } from "../_lib/StatRail";
-import { FindingsTable, type Finding } from "./FindingsTable";
+import { EventReportCard, type EventReport } from "./EventReportCard";
 
-type Approved = { screen: string; event_type: string; event_order: number | string | null };
 type OpenQuestion = { screen: string; field: string; note: string };
 type Validation = {
   summary: { total: number; red: number; amber: number; green: number; adherence_pct: number };
-  findings: Finding[];
-  approved: Approved[];
+  events: EventReport[];
   open_questions: OpenQuestion[];
 };
 
@@ -28,11 +26,13 @@ export default function Validate5Page() {
   const [result, setResult] = useState<Validation | null>(null);
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [onlyProblems, setOnlyProblems] = useState(false);
 
   async function handleFile(file: File | null) {
     setFileName(file ? file.name : null);
     setResult(null);
     setError(null);
+    setOnlyProblems(false);
     if (!file) return;
     setRunning(true);
     try {
@@ -46,6 +46,12 @@ export default function Validate5Page() {
   }
 
   const s = result?.summary;
+  const events = useMemo(() => result?.events ?? [], [result]);
+  const problemCount = useMemo(() => events.filter((e) => e.verdict !== "green").length, [events]);
+  const shown = useMemo(
+    () => events.filter((e) => !onlyProblems || e.verdict !== "green"),
+    [events, onlyProblems],
+  );
 
   return (
     <main className="shell">
@@ -53,8 +59,8 @@ export default function Validate5Page() {
         <div className="eyebrow">tagmatch / tools / validate-5.0</div>
         <h1>Validar mapa 5.0</h1>
         <p className="lede">
-          Audita um mapa Whimsical no padrão App 5.0 contra o padrão de taxonomia:
-          completude, campos legados, enums, nomenclatura e coerência.
+          Audita um mapa Whimsical no padrão App 5.0: cada evento com todos os campos,
+          status, valor e o motivo vindo do padrão de taxonomia.
         </p>
 
         <div className="panel control-panel">
@@ -86,19 +92,20 @@ export default function Validate5Page() {
           </div>
 
           <div className="narrow">
-            <FindingsTable findings={result!.findings} />
+            <div className="report-toolbar">
+              <button className={`chip${!onlyProblems ? " on" : ""}`} onClick={() => setOnlyProblems(false)}>
+                todos ({events.length})
+              </button>
+              <button className={`chip${onlyProblems ? " on" : ""}`} onClick={() => setOnlyProblems(true)}>
+                só com problemas ({problemCount})
+              </button>
+            </div>
 
-            <details className="report-section">
-              <summary>Aprovados ({result!.approved.length})</summary>
-              <ul className="report-list">
-                {result!.approved.map((a, i) => (
-                  <li key={i}>
-                    <span className="mono">{a.screen || "—"}</span> · {a.event_type}
-                    {a.event_order != null ? ` #${a.event_order}` : ""}
-                  </li>
-                ))}
-              </ul>
-            </details>
+            <div className="report-cards">
+              {shown.map((e, i) => (
+                <EventReportCard key={`${String(e.event_order ?? "?")}-${i}`} event={e} />
+              ))}
+            </div>
 
             <details className="report-section">
               <summary>Perguntas em aberto ({result!.open_questions.length})</summary>

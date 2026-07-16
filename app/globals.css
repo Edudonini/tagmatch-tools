@@ -1768,10 +1768,6 @@ tbody tr:hover {
 }
 
 /* Findings table (validate-5.0 report) */
-.findings-filter { display: flex; gap: 8px; margin: 16px 0 12px; flex-wrap: wrap; }
-.findings-filter .chip { padding: 4px 10px; border-radius: 999px; border: 1px solid var(--border);
-  background: transparent; color: inherit; cursor: pointer; font-size: 13px; }
-.findings-filter .chip.on { border-color: var(--accent); }
 .findings-scroll { overflow-x: auto; }
 .findings-table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .findings-table th, .findings-table td { text-align: left; padding: 8px 10px;
@@ -1782,3 +1778,34 @@ tbody tr:hover {
 .report-section { margin-top: 20px; border-top: 1px solid var(--border); padding-top: 12px; }
 .report-section summary { cursor: pointer; font-weight: 600; }
 .report-list { margin: 10px 0 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; }
+
+/* Chip toggle (reused by report toolbars) */
+.chip { padding: 4px 10px; border-radius: 999px; border: 1px solid var(--border);
+  background: transparent; color: inherit; cursor: pointer; font-size: 13px; }
+.chip.on { border-color: var(--accent); }
+
+/* Event report cards (validate-5.0) */
+.report-toolbar { display: flex; gap: 8px; margin: 16px 0 8px; }
+.report-cards { display: flex; flex-direction: column; gap: 14px; }
+.report-card { padding: 14px 16px; }
+.report-card-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+.verdict-dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+.verdict-dot.v-red { background: var(--error); }
+.verdict-dot.v-amber { background: var(--warning); }
+.verdict-dot.v-green { background: var(--nonint); }
+.report-screen { color: var(--text-muted); }
+.report-counts { margin-left: auto; display: flex; gap: 10px; font-size: 12px; }
+.report-fields { display: flex; flex-direction: column; }
+.report-row { display: grid; grid-template-columns: 18px 190px minmax(0, 1fr) minmax(0, 1.1fr);
+  gap: 10px; align-items: start; padding: 4px 0; font-size: 13px; line-height: 1.4; }
+.report-ico { text-align: center; }
+.report-value, .report-reason { overflow-wrap: anywhere; }
+.report-reason { color: var(--text-faint); }
+.report-row.st-missing .report-value { color: var(--error); }
+.report-row.st-red .report-value { color: var(--error); }
+.report-row.st-extra { opacity: 0.55; }
+@media (max-width: 680px) {
+  .report-row { grid-template-columns: 18px 1fr; }
+  .report-value, .report-reason { grid-column: 2; }
+}
