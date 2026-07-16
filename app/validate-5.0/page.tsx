@@ -1,47 +1,51 @@
 "use client";
 
 import { useState } from "react";
-import { badgeLabel } from "../_lib/ResultsPanel";
 import { Dropzone } from "../_lib/Dropzone";
 import { StatRail } from "../_lib/StatRail";
-import { EventParamsCard, type Extracted5Event } from "./EventParamsCard";
+import { FindingsTable, type Finding } from "./FindingsTable";
 
-async function extract5(file: File): Promise<Extracted5Event[]> {
+type Approved = { screen: string; event_type: string; event_order: number | string | null };
+type OpenQuestion = { screen: string; field: string; note: string };
+type Validation = {
+  summary: { total: number; red: number; amber: number; green: number; adherence_pct: number };
+  findings: Finding[];
+  approved: Approved[];
+  open_questions: OpenQuestion[];
+};
+
+async function validate5(file: File): Promise<Validation> {
   const form = new FormData();
   form.append("file", file);
-  const res = await fetch("/api/extract-5.0", { method: "POST", body: form });
+  const res = await fetch("/api/validate-5.0", { method: "POST", body: form });
   const data = await res.json();
-  if (data.ok) return data.events as Extracted5Event[];
-  throw new Error(data.error || "Falha na extração");
+  if (data.ok) return data.validation as Validation;
+  throw new Error(data.error || "Falha na validação");
 }
 
 export default function Validate5Page() {
   const [fileName, setFileName] = useState<string | null>(null);
-  const [events, setEvents] = useState<Extracted5Event[] | null>(null);
-  const [extracting, setExtracting] = useState(false);
-  const [extractError, setExtractError] = useState<string | null>(null);
+  const [result, setResult] = useState<Validation | null>(null);
+  const [running, setRunning] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function handleFile(file: File | null) {
     setFileName(file ? file.name : null);
-    setEvents(null);
-    setExtractError(null);
+    setResult(null);
+    setError(null);
     if (!file) return;
-    setExtracting(true);
+    setRunning(true);
     try {
-      const extracted = await extract5(file);
-      setEvents(extracted);
+      setResult(await validate5(file));
     } catch (err) {
-      setEvents(null);
-      setExtractError(err instanceof Error ? err.message : "Request failed. Please try again.");
+      setResult(null);
+      setError(err instanceof Error ? err.message : "Request failed. Please try again.");
     } finally {
-      setExtracting(false);
+      setRunning(false);
     }
   }
 
-  const eventTypeCounts = (events ?? []).reduce<Record<string, number>>((acc, e) => {
-    acc[e.event_type] = (acc[e.event_type] ?? 0) + 1;
-    return acc;
-  }, {});
+  const s = result?.summary;
 
   return (
     <main className="shell">
@@ -49,8 +53,8 @@ export default function Validate5Page() {
         <div className="eyebrow">tagmatch / tools / validate-5.0</div>
         <h1>Validar mapa 5.0</h1>
         <p className="lede">
-          Extrai um mapa Whimsical no padrão App 5.0 e mostra os parâmetros
-          limpos por evento, para conferir a qualidade da extração.
+          Audita um mapa Whimsical no padrão App 5.0 contra o padrão de taxonomia:
+          completude, campos legados, enums, nomenclatura e coerência.
         </p>
 
         <div className="panel control-panel">
@@ -61,35 +65,57 @@ export default function Validate5Page() {
             idle="Arraste um SVG do mapa 5.0"
             hint="ou clique para escolher"
           />
-          {extracting && <span className="qb-parsing">Extraindo…</span>}
+          {running && <span className="qb-parsing">Validando…</span>}
         </div>
 
-        {extractError && <p className="alert-error">Não consegui extrair: {extractError}</p>}
+        {error && <p className="alert-error">Não consegui validar: {error}</p>}
       </div>
 
-      {events && events.length > 0 && (
+      {s && (
         <>
           <div className="narrow">
             <StatRail
               stats={[
-                { label: "eventos", value: String(events.length) },
-                ...Object.entries(eventTypeCounts).map(([name, count]) => ({
-                  label: badgeLabel(name),
-                  value: String(count),
-                })),
+                { label: "aderência", value: `${s.adherence_pct}%`, tone: "accent" },
+                { label: "🔴 críticos", value: String(s.red) },
+                { label: "🟡 atenção", value: String(s.amber) },
+                { label: "🟢 ok", value: String(s.green) },
+                { label: "eventos", value: String(s.total) },
               ]}
             />
           </div>
 
-          <div className="c5-events-col">
-            {events.map((ev, index) => (
-              <EventParamsCard key={`${String(ev.event_order ?? "?")}-${index}`} event={ev} />
-            ))}
+          <div className="narrow">
+            <FindingsTable findings={result!.findings} />
+
+            <details className="report-section">
+              <summary>Aprovados ({result!.approved.length})</summary>
+              <ul className="report-list">
+                {result!.approved.map((a, i) => (
+                  <li key={i}>
+                    <span className="mono">{a.screen || "—"}</span> · {a.event_type}
+                    {a.event_order != null ? ` #${a.event_order}` : ""}
+                  </li>
+                ))}
+              </ul>
+            </details>
+
+            <details className="report-section">
+              <summary>Perguntas em aberto ({result!.open_questions.length})</summary>
+              <ul className="report-list">
+                {result!.open_questions.map((q, i) => (
+                  <li key={i}>
+                    {q.field ? <span className="mono">{q.field}</span> : null}
+                    {q.field ? " · " : ""}
+                    {q.note}
+                    {q.screen ? <span className="mono"> ({q.screen})</span> : null}
+                  </li>
+                ))}
+              </ul>
+            </details>
           </div>
         </>
       )}
-
-      {events && events.length === 0 && <p className="mv-empty">Nenhum evento para exibir.</p>}
     </main>
   );
 }

@@ -1766,3 +1766,19 @@ tbody tr:hover {
   color: var(--text-muted);
   margin-right: 4px;
 }
+
+/* Findings table (validate-5.0 report) */
+.findings-filter { display: flex; gap: 8px; margin: 16px 0 12px; flex-wrap: wrap; }
+.findings-filter .chip { padding: 4px 10px; border-radius: 999px; border: 1px solid var(--border);
+  background: transparent; color: inherit; cursor: pointer; font-size: 13px; }
+.findings-filter .chip.on { border-color: var(--accent); }
+.findings-scroll { overflow-x: auto; }
+.findings-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.findings-table th, .findings-table td { text-align: left; padding: 8px 10px;
+  border-bottom: 1px solid var(--border); vertical-align: top; }
+.findings-table th { font-weight: 600; opacity: 0.7; }
+.sev-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+.sev-red { background: var(--error); } .sev-amber { background: var(--warning); }
+.report-section { margin-top: 20px; border-top: 1px solid var(--border); padding-top: 12px; }
+.report-section summary { cursor: pointer; font-weight: 600; }
+.report-list { margin: 10px 0 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; }
