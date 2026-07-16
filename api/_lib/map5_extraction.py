@@ -8,16 +8,22 @@ is not modified.
 """
 import re
 
-# Known field names used as split boundaries. Longest first so multi-word names
-# (event_detail, event_access_type, event_plan_type) win over their prefixes.
-_KNOWN_FIELDS = [
-    "event_access_type", "event_plan_type", "event_detail", "event_cnpj", "event_order",
-    "screenName", "origin_nv", "client_category", "department", "macro_journey",
-    "micro_journey", "status_journey", "component_type", "component_copy",
-    "error_status", "error_type", "error_code", "plan_name", "journeyVariant",
-    "crm_name", "payment_method", "info_detail", "description", "value",
-    "event", "name", "sn", "ct", "ac", "lb",
+from tagmatch.config import SUPPORTED_KEYS
+
+# Field names used as split boundaries. The pinned parser recognizes SUPPORTED_KEYS
+# (title, module_name, position, tag_label, component_*, …) as fields when parsing KV
+# pairs, so the re-parser must treat every one of them as a boundary — otherwise an
+# unrecognized field collapses into the previous field's value. Deriving from
+# SUPPORTED_KEYS keeps the re-parser's vocabulary in lockstep with the parser.
+#
+# App 5.0 additionally uses these fields, which are NOT in SUPPORTED_KEYS (the base
+# parser merges them into adjacent values); the re-parser must still split them.
+_EXTRA_5_0_FIELDS = [
+    "event", "screenName", "event_access_type", "event_plan_type", "event_detail",
+    "event_order", "department", "macro_journey", "micro_journey", "status_journey",
+    "error_status", "error_code", "crm_name", "journeyVariant",
 ]
+_KNOWN_FIELDS = [*SUPPORTED_KEYS, *_EXTRA_5_0_FIELDS]
 # dedup preserving first-seen order, then stable-sort longest-first, so the
 # boundary precedence is deterministic even between same-length field names.
 _SORTED = sorted(dict.fromkeys(_KNOWN_FIELDS), key=len, reverse=True)

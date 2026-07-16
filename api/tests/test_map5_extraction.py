@@ -73,6 +73,20 @@ def test_split_emits_canonical_field_casing():
     assert "screenname" not in p and "journeyvariant" not in p
 
 
+def test_split_recognizes_supported_keys_fields():
+    # Real collapse case from a 5.0 map: title/module_name/position/tag_label are in the
+    # parser's SUPPORTED_KEYS, so the re-parser must split them, not swallow them into the
+    # previous field's value.
+    raw = ("event_cnpj:[area_da_jornada]\ntitle:[titulo_principal]\n"
+           "module_name:hub_pagamentos\nposition:2\ntag_label:[rotulo]")
+    p = split_params(raw)
+    assert p["event_cnpj"] == "[area_da_jornada]"  # no longer swallows title
+    assert p["title"] == "[titulo_principal]"
+    assert p["module_name"] == "hub_pagamentos"
+    assert p["position"] == "2"
+    assert p["tag_label"] == "[rotulo]"
+
+
 def test_split_longest_name_precedence():
     p = split_params("event_detail:clique_x\nevent:interaction")
     assert p["event_detail"] == "clique_x"
