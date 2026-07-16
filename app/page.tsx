@@ -36,6 +36,13 @@ const TOOLS = [
     desc: "Converte um mapa App 4 para a taxonomia App 5.0, com apoio de contexto de jornada.",
     available: true,
   },
+  {
+    href: "/validate-5.0",
+    glyph: "V5",
+    name: "Validar mapa 5.0",
+    desc: "Extrai um mapa Whimsical no padrão App 5.0 e mostra os parâmetros limpos por evento.",
+    available: true,
+  },
 ];
 
 export default function Home() {

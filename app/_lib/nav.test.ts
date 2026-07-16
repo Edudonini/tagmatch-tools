@@ -14,13 +14,14 @@ describe("isNavActive", () => {
   it("does not treat a prefix collision as active", () => {
     expect(isNavActive("/extract-maps-other", "/extract-map")).toBe(false);
   });
-  it("exposes the five tools in order", () => {
+  it("exposes the six tools in order", () => {
     expect(NAV_ITEMS.map((n) => n.href)).toEqual([
       "/extract-map",
       "/extract-logs",
       "/build-query",
       "/match",
       "/convert-5.0",
+      "/validate-5.0",
     ]);
   });
 });

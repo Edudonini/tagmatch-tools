@@ -6,6 +6,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/build-query", label: "Query" },
   { href: "/match", label: "Matching" },
   { href: "/convert-5.0", label: "5.0" },
+  { href: "/validate-5.0", label: "Validar 5.0" },
 ];
 
 export function isNavActive(pathname: string, href: string): boolean {
