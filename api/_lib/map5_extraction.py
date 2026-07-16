@@ -60,16 +60,75 @@ def split_params(text):
 
 _BBOX_KEYS = ("_bbox_x1", "_bbox_y1", "_bbox_x2", "_bbox_y2")
 
+# A card is a real event only if it carries at least one of these taxonomy fields
+# (OR filter). Scratch/placeholder cards (e.g. only a legacy `sn` with junk text) are
+# dropped. `sn`/`ct`/`ac`/`lb` are deliberately NOT signals — a legacy-only card is noise.
+_EVENT_SIGNAL_FIELDS = frozenset({
+    "event", "screenName", "origin_nv", "event_access_type", "client_category",
+    "department", "macro_journey", "micro_journey", "event_detail", "status_journey",
+    "component_type", "component_copy", "event_cnpj", "info_detail", "module_name",
+    "position", "tag_label", "plan_name", "event_plan_type", "error_type", "error_status",
+})
 
-def reparse_5_0(spec):
-    """Turn parse_svg_spec records into [{event_type, event_order, bbox, params}]."""
-    if not isinstance(spec, list):
-        raise ValueError("spec must be a list.")
-    out = []
-    for e in spec:
+
+def _bucket_lines_by_bbox(spec, lines):
+    """Assign each text line to the tightest event bbox that contains it, returning
+    {spec_index: [line_text, ...]} y-sorted. The base parser's KV assembly mangles
+    raw_lines on some layouts, but its line reading and card bboxes are correct — so we
+    re-derive each event's text from the raw lines it geometrically contains."""
+    boxes = []  # (index, x1, y1, x2, y2, area)
+    for i, e in enumerate(spec):
         if not isinstance(e, dict):
             continue
-        params = split_params(e.get("raw_lines"))
+        vals = [e.get(k) for k in _BBOX_KEYS]
+        if any(v is None for v in vals):
+            continue
+        try:
+            x1, y1, x2, y2 = (float(v) for v in vals)
+        except (TypeError, ValueError):
+            continue
+        boxes.append((i, x1, y1, x2, y2, (x2 - x1) * (y2 - y1)))
+    buckets = {}
+    for ln in lines or []:
+        if not isinstance(ln, dict):
+            continue
+        text = str(ln.get("text") or "")
+        if not text.strip():
+            continue
+        try:
+            lx, ly = float(ln.get("x")), float(ln.get("y"))
+        except (TypeError, ValueError):
+            continue
+        best = None  # (index, area)
+        for (i, x1, y1, x2, y2, area) in boxes:
+            if x1 <= lx <= x2 and y1 <= ly <= y2 and (best is None or area < best[1]):
+                best = (i, area)
+        if best is not None:
+            buckets.setdefault(best[0], []).append((ly, text))
+    return {i: [t for _, t in sorted(v)] for i, v in buckets.items()}
+
+
+def reparse_5_0(spec, lines=None):
+    """Turn parse_svg_spec records into [{event_type, event_order, bbox, params}].
+
+    When `lines` (the raw text lines from extract_map) is given, each event's params are
+    re-derived from the lines inside its bbox (robust against the base parser's KV-assembly
+    mangling); otherwise the base parser's `raw_lines` is used. Scratch/placeholder cards
+    that carry no real taxonomy field are dropped.
+    """
+    if not isinstance(spec, list):
+        raise ValueError("spec must be a list.")
+    line_buckets = _bucket_lines_by_bbox(spec, lines) if lines else None
+    out = []
+    for i, e in enumerate(spec):
+        if not isinstance(e, dict):
+            continue
+        if line_buckets is not None and line_buckets.get(i):
+            params = split_params("\n".join(line_buckets[i]))
+        else:
+            params = split_params(e.get("raw_lines"))
+        if not any(f in params for f in _EVENT_SIGNAL_FIELDS):
+            continue  # noise / placeholder card, not a real event
         event_type = params.get("event") or (str(e.get("name")) if e.get("name") is not None else "")
         bbox = {k: e.get(k) for k in _BBOX_KEYS if e.get(k) is not None}
         out.append({

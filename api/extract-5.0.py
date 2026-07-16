@@ -22,7 +22,7 @@ def handle_extract_5_0():
     if not base.get("ok"):
         return jsonify({"ok": False, "error": base.get("error", "Failed to parse SVG")}), 400
     try:
-        events = reparse_5_0(base["spec"])
+        events = reparse_5_0(base["spec"], base.get("lines"))
     except ValueError as e:
         return jsonify({"ok": False, "error": str(e)}), 400
     return jsonify({"ok": True, "events": events}), 200

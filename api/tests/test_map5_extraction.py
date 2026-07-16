@@ -126,6 +126,61 @@ def test_reparse_empty_spec():
     assert reparse_5_0([]) == []
 
 
+def test_reparse_rebuckets_lines_by_bbox():
+    # The base parser's raw_lines dropped fields on this layout; re-bucketing the raw text
+    # lines inside the event's bbox recovers them. Lines outside the bbox are excluded.
+    spec = [{
+        "name": "screen_view", "event_order": 1.0,
+        "_bbox_x1": 0.0, "_bbox_y1": 0.0, "_bbox_x2": 100.0, "_bbox_y2": 100.0,
+        "raw_lines": "sn:profile",  # broken/partial from the parser
+    }]
+    lines = [
+        {"x": 10, "y": 10, "text": "event: screen_view"},
+        {"x": 10, "y": 20, "text": "screenName: profile"},
+        {"x": 10, "y": 30, "text": "macro_journey: menu_perfil"},
+        {"x": 999, "y": 999, "text": "department: fora_do_bbox"},  # outside → not bucketed
+    ]
+    out = reparse_5_0(spec, lines)
+    assert len(out) == 1
+    p = out[0]["params"]
+    assert p["event"] == "screen_view"
+    assert p["screenName"] == "profile"
+    assert p["macro_journey"] == "menu_perfil"
+    assert "department" not in p  # the outside-bbox line was excluded
+
+
+def test_reparse_noise_filter_drops_legacy_only_card():
+    # a scratch/placeholder card carrying only a legacy sn is not a real event
+    spec = [{"name": "screen_view", "event_order": None,
+             "_bbox_x1": 0.0, "_bbox_y1": 0.0, "_bbox_x2": 50.0, "_bbox_y2": 50.0,
+             "raw_lines": "sn:Thundercats"}]
+    lines = [{"x": 10, "y": 10, "text": "sn: Thundercats"}]
+    assert reparse_5_0(spec, lines) == []
+
+
+def test_reparse_tightest_bbox_wins():
+    # a line inside two overlapping bboxes is assigned to the smaller (tightest) one
+    spec = [
+        {"name": "screen_view", "event_order": 1,
+         "_bbox_x1": 0.0, "_bbox_y1": 0.0, "_bbox_x2": 200.0, "_bbox_y2": 200.0, "raw_lines": ""},
+        {"name": "interaction", "event_order": 2,
+         "_bbox_x1": 0.0, "_bbox_y1": 0.0, "_bbox_x2": 50.0, "_bbox_y2": 50.0, "raw_lines": ""},
+    ]
+    lines = [{"x": 10, "y": 10, "text": "component_type: button"}]
+    out = reparse_5_0(spec, lines)
+    # the smaller (interaction) box claims the line; the empty screen_view is noise-filtered
+    assert len(out) == 1 and out[0]["event_type"] == "interaction"
+    assert out[0]["params"]["component_type"] == "button"
+
+
+def test_reparse_without_lines_uses_raw_lines():
+    # backward compatibility: no lines → split the parser's raw_lines as before
+    spec = [{"name": "interaction", "event_order": 1,
+             "raw_lines": "event:interaction\ncomponent_type:button"}]
+    out = reparse_5_0(spec)
+    assert len(out) == 1 and out[0]["params"]["component_type"] == "button"
+
+
 import importlib.util
 
 

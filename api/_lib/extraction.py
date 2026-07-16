@@ -9,6 +9,7 @@ import tempfile
 import numpy as np
 import pandas as pd
 from tagmatch.svg_parser import parse_svg_spec
+from tagmatch.svg.reader import read_text_lines
 
 VALID_MODES = ("header", "card", "hybrid")
 
@@ -37,8 +38,10 @@ def _sanitize(obj):
 def extract_map(svg_bytes: bytes, mode: str = "card") -> dict:
     """Extract a TagMatch spec from an uploaded Whimsical SVG map.
 
-    Returns {"ok": True, "spec": [...], "report": {...}} on success,
-    or {"ok": False, "error": "..."} if the SVG can't be parsed.
+    Returns {"ok": True, "spec": [...], "report": {...}, "lines": [...]} on success,
+    or {"ok": False, "error": "..."} if the SVG can't be parsed. `lines` are the raw
+    text lines ({x, y, text}) — consumers (e.g. reparse_5_0) can re-bucket them by event
+    bbox when the parser's own KV assembly is unreliable for a map's layout.
     """
     if mode not in VALID_MODES:
         return {
@@ -51,10 +54,12 @@ def extract_map(svg_bytes: bytes, mode: str = "card") -> dict:
         with os.fdopen(fd, "wb") as f:
             f.write(svg_bytes)
         df_spec, report = parse_svg_spec(temp_path, mode=mode)
+        raw_lines = read_text_lines(temp_path)
     except Exception as e:
         return {"ok": False, "error": f"Failed to parse SVG: {e}"}
     finally:
         os.remove(temp_path)
 
     records = df_spec.to_dict(orient="records")
-    return {"ok": True, "spec": _sanitize(records), "report": _sanitize(report)}
+    lines = [{"x": ln.get("x"), "y": ln.get("y"), "text": ln.get("text")} for ln in raw_lines]
+    return {"ok": True, "spec": _sanitize(records), "report": _sanitize(report), "lines": _sanitize(lines)}
