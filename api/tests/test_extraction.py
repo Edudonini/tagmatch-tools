@@ -83,3 +83,25 @@ def test_extract_card_mode_with_synthetic_cards():
     assert spec[1]["name"] == "interaction"
     assert spec[1]["ac"] == "screen_click_button"
     assert spec[1]["lb"] == "test_button"
+
+
+def test_extract_uses_svg_structure_when_parser_misses_cards():
+    # App 5.0 layout: the base parser misses these cards; the structural reader recovers them
+    result = extract_map(_read("map5_cards.svg"), mode="card")
+    assert result["ok"] is True
+    assert result["report"]["extraction_source"] == "svg_structure"
+    assert result["report"]["events_extracted"] == 3
+    sv, inter, legacy = result["spec"]
+    assert sv["name"] == "screen_view" and sv["event_order"] == 7.0
+    # a 5.0 screen_view's screenName fills sn (the parser's alias), so it groups by screen
+    assert sv["sn"] == "/hub-de-pagamentos/adicionar-cartao"
+    assert sv["sn_regex"]
+    # 5.0 fields outside the parser schema ride along verbatim
+    assert sv["department"] == "comercial"
+    assert sv["crmName"] == "[siebel|next]"
+    # legacy fields follow the parser's convention (spaces removed) and get regex helpers
+    assert inter["name"] == "interaction"
+    assert inter["sn"] == "/[nappoueasy]/hub-payment/insert-card-data/failed-invalid-card-error"
+    assert inter["ac"] == "screen_click_button" and inter["ac_regex"] == "^screen_click_button$"
+    assert inter["spec_id"] and inter["_bbox_x1"] == 1000.0
+    assert legacy["name"] == "noninteraction"  # kind from card color

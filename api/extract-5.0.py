@@ -18,19 +18,15 @@ def handle_extract_5_0():
     content = request.files["file"].read()
     if not content:
         return jsonify({"ok": False, "error": "Uploaded file is empty"}), 400
-    # Primary: read cards from the SVG's shape structure (exact per-card text). Fall back to
-    # the base parser + bbox re-parse for exports without Whimsical's content groups.
-    try:
-        events = extract_cards_5_0(content)
-    except ValueError:
-        events = []
-    if events:
-        return jsonify({"ok": True, "events": events}), 200
     base = extract_map(content, mode="card")
     if not base.get("ok"):
         return jsonify({"ok": False, "error": base.get("error", "Failed to parse SVG")}), 400
     try:
-        events = reparse_5_0(base["spec"], base.get("lines"))
+        reparsed = reparse_5_0(base["spec"], base.get("lines"))
     except ValueError as e:
         return jsonify({"ok": False, "error": str(e)}), 400
+    # Cards read from the SVG's shape structure carry exact per-card text; use them unless
+    # the parser + bbox re-parse recovers more events (exports without that structure).
+    cards = extract_cards_5_0(content)
+    events = cards if len(cards) >= len(reparsed) else reparsed
     return jsonify({"ok": True, "events": events}), 200

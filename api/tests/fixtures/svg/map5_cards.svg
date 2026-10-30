@@ -28,6 +28,22 @@
     <g><g><g><g><text><tspan x="2010" y="120">exemplo de retorno do macro_journey:</tspan></text></g></g></g></g>
     <g><g><g><g><text><tspan x="2010" y="144">macro_journey: pagamento_da_fatura</tspan></text></g></g></g></g>
   </g></g></g></g>
+  <!-- legacy card with no name: line: its kind comes from the card color (#d1efec) -->
+  <g><g><g><path d="M2600,100h300v200h-300z" data-fill="fill-outline/green" fill="#d1efec"></path><g class="content">
+    <g><g><g><g><text><tspan x="2610" y="120">ac: screen_view_alert</tspan></text></g></g></g></g>
+    <g><g><g><g><text><tspan x="2610" y="144">department: comercial</tspan></text></g></g></g></g>
+    <g><g><g><g><text><tspan x="2610" y="168">component_type: alert</tspan></text></g></g></g></g>
+  </g></g></g></g>
+  <!-- disabled card color (#ced8e0): never extracted, even with an explicit kind -->
+  <g><g><g><path d="M2600,600h300v200h-300z" fill="#ced8e0"></path><g class="content">
+    <g><g><g><g><text><tspan x="2610" y="620">event: interaction</tspan></text></g></g></g></g>
+    <g><g><g><g><text><tspan x="2610" y="644">department: comercial</tspan></text></g></g></g></g>
+  </g></g></g></g>
+  <!-- loose annotation text (no outline path, no kind): dropped -->
+  <g><g class="content">
+    <g><g><g><g><text><tspan x="2610" y="1500">component_type: icon</tspan></text></g></g></g></g>
+    <g><g><g><g><text><tspan x="2610" y="1524">component_copy: perfil</tspan></text></g></g></g></g>
+  </g></g>
   <!-- legend/template card: every value is a placeholder and there is no badge -->
   <g><g><g><path d="M2000,1000h400v300h-400z" data-fill="fill-outline/blue"></path><g class="content">
     <g><g><g><g><text><tspan x="2010" y="1020">event: screen_view</tspan></text></g></g></g></g>

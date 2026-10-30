@@ -14,6 +14,7 @@ import re
 import xml.etree.ElementTree as ET
 
 from tagmatch.config import SUPPORTED_KEYS
+from tagmatch.defaults import DISABLED_CARD_COLORS, NOTE_CARD_COLORS, get_event_type_by_color
 
 from .taxonomy5 import EVENT_KINDS
 
@@ -258,6 +259,7 @@ def _read_shapes(root):
             bbox = (min(xs), min(ys), max(xs), max(ys))
         shapes.append({
             "fill": outline.get("data-fill") if outline is not None else None,
+            "color": (outline.get("fill") or "").lower() if outline is not None else "",
             "bbox": bbox,
             "paragraphs": paragraphs,
         })
@@ -320,7 +322,9 @@ def extract_cards_5_0(svg_bytes):
     Returns [{event_type, event_order, bbox, params}] (same shape as reparse_5_0). A shape
     is an event when it names a known event kind (`event:` or legacy `name:`), or carries
     at least two taxonomy fields — so annotation notes that mention one field are dropped.
-    Legend/example cards (no `L<n>` badge, every value a placeholder) are dropped too.
+    Legend/example cards (no `L<n>` badge, every value a placeholder) and note/disabled
+    card colors are dropped too. A card without `event:`/`name:` takes its kind from its
+    color (the base parser's CARD_COLOR_MAPPING).
     Raises ValueError when the bytes are not parseable SVG/XML.
     """
     try:
@@ -338,11 +342,17 @@ def extract_cards_5_0(svg_bytes):
 
     events = []
     for s in shapes:
+        if s["color"] in NOTE_CARD_COLORS or s["color"] in DISABLED_CARD_COLORS:
+            continue  # note/info box or disabled event, as the base parser treats them
         params = card_params(s["paragraphs"])
         event_type = params.get("event") or params.get("name") or ""
         signals = sum(1 for f in _EVENT_SIGNAL_FIELDS if f in params)
         if event_type.strip().lower() not in EVENT_KINDS and signals < 2:
             continue
+        # legacy cards carry no `event:`/`name:` line — their kind is the card color
+        event_type = event_type or get_event_type_by_color(s["color"]) or ""
+        if not event_type:
+            continue  # loose annotation text (no card outline): kind can't be known
         events.append((s, event_type, params))
 
     used = set()

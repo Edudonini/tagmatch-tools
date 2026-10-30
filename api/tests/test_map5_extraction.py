@@ -219,17 +219,24 @@ def _fixture_events():
 def test_cards_reads_each_shape_as_one_event():
     events = _fixture_events()
     # the note (one taxonomy field) and the legend card (all placeholders, no badge) are dropped
-    assert [e["event_type"] for e in events] == ["screen_view", "interaction"]
+    # the color-typed legacy card is kept; the disabled card and loose annotation text are not
+    assert [e["event_type"] for e in events] == ["screen_view", "interaction", "noninteraction"]
+
+
+def test_cards_without_kind_line_take_kind_from_color():
+    *_, legacy = _fixture_events()
+    assert legacy["event_type"] == "noninteraction"
+    assert legacy["params"]["ac"] == "screen_view_alert"
 
 
 def test_cards_badge_gives_event_order():
-    sv, inter = _fixture_events()
+    sv, inter, _ = _fixture_events()
     assert sv["event_order"] == 7
     assert inter["event_order"] is None  # no badge above the interaction card
 
 
 def test_cards_joins_soft_wrapped_runs():
-    sv, inter = _fixture_events()
+    sv, inter, _ = _fixture_events()
     assert inter["params"]["sn"] == "/[napp ou easy]/hub-payment/insert-card-data/failed-invalid-card-error"
     assert inter["params"]["lb"] == "[tipo de erro]&[blocker ou nonBlocker]&cartaoInvalido"
     assert sv["params"]["macro_journey"] == "[jornada_de_origem]"
@@ -237,14 +244,14 @@ def test_cards_joins_soft_wrapped_runs():
 
 
 def test_cards_crmname_is_not_split_into_name():
-    sv, _ = _fixture_events()
+    sv, *_ = _fixture_events()
     assert sv["params"]["crmName"] == "[siebel|next]"
     assert "name" not in sv["params"]
     assert sv["params"]["department"] == "comercial"
 
 
 def test_cards_unknown_leading_field_is_its_own_param():
-    _, inter = _fixture_events()
+    _, inter, _ = _fixture_events()
     assert inter["params"]["custom_flag"] == "sim"
     assert inter["params"]["status_journey"] == "erro"  # not swallowing the unknown field
 
@@ -252,13 +259,13 @@ def test_cards_unknown_leading_field_is_its_own_param():
 def test_cards_manual_line_break_splits_fields():
     # Shift+Enter inside one paragraph is exported as a `\n` run; the unknown field after it
     # must still become its own param instead of being glued to the previous value
-    _, inter = _fixture_events()
+    _, inter, _ = _fixture_events()
     assert inter["params"]["ac"] == "screen_click_button"
     assert inter["params"]["other_flag"] == "nao"
 
 
 def test_cards_bbox_from_outline_path():
-    sv, inter = _fixture_events()
+    sv, inter, _ = _fixture_events()
     assert sv["bbox"] == {"_bbox_x1": 100.0, "_bbox_y1": 100.0, "_bbox_x2": 775.0, "_bbox_y2": 540.0}
     assert inter["bbox"] == {"_bbox_x1": 1000.0, "_bbox_y1": 100.0, "_bbox_x2": 1400.0, "_bbox_y2": 700.0}
 
@@ -285,4 +292,4 @@ def test_endpoint_uses_structural_reader():
     r = _endpoint_client().post("/api/extract-5.0", data=data, content_type="multipart/form-data")
     body = r.get_json()
     assert r.status_code == 200 and body["ok"] is True
-    assert [e["event_type"] for e in body["events"]] == ["screen_view", "interaction"]
+    assert [e["event_type"] for e in body["events"]] == ["screen_view", "interaction", "noninteraction"]
