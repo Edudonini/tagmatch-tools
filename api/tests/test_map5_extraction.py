@@ -4,7 +4,9 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
 import pytest
-from api._lib.map5_extraction import reparse_5_0, split_params
+from api._lib.map5_extraction import (
+    card_params, extract_cards_5_0, reparse_5_0, split_params, _path_bbox,
+)
 
 # Real merged card text from the 5.0 test map.
 INTERACTION_RAW = (
@@ -202,3 +204,85 @@ def test_endpoint_bad_svg_is_400_not_500():
     data = {"file": (io.BytesIO(b"not an svg"), "x.svg")}
     r = _endpoint_client().post("/api/extract-5.0", data=data, content_type="multipart/form-data")
     assert r.status_code == 400
+
+
+# --- Structural card reader (extract_cards_5_0) ---
+
+FIXTURE_SVG = os.path.join(os.path.dirname(__file__), "fixtures", "svg", "map5_cards.svg")
+
+
+def _fixture_events():
+    with open(FIXTURE_SVG, "rb") as f:
+        return extract_cards_5_0(f.read())
+
+
+def test_cards_reads_each_shape_as_one_event():
+    events = _fixture_events()
+    # the note (one taxonomy field) and the legend card (all placeholders, no badge) are dropped
+    assert [e["event_type"] for e in events] == ["screen_view", "interaction"]
+
+
+def test_cards_badge_gives_event_order():
+    sv, inter = _fixture_events()
+    assert sv["event_order"] == 7
+    assert inter["event_order"] is None  # no badge above the interaction card
+
+
+def test_cards_joins_soft_wrapped_runs():
+    sv, inter = _fixture_events()
+    assert inter["params"]["sn"] == "/[napp ou easy]/hub-payment/insert-card-data/failed-invalid-card-error"
+    assert inter["params"]["lb"] == "[tipo de erro]&[blocker ou nonBlocker]&cartaoInvalido"
+    assert sv["params"]["macro_journey"] == "[jornada_de_origem]"
+    assert sv["params"]["journeyVariant"] == "[jornadaDeOrigem] *VERIFICAR*"
+
+
+def test_cards_crmname_is_not_split_into_name():
+    sv, _ = _fixture_events()
+    assert sv["params"]["crmName"] == "[siebel|next]"
+    assert "name" not in sv["params"]
+    assert sv["params"]["department"] == "comercial"
+
+
+def test_cards_unknown_leading_field_is_its_own_param():
+    _, inter = _fixture_events()
+    assert inter["params"]["custom_flag"] == "sim"
+    assert inter["params"]["status_journey"] == "erro"  # not swallowing the unknown field
+
+
+def test_cards_manual_line_break_splits_fields():
+    # Shift+Enter inside one paragraph is exported as a `\n` run; the unknown field after it
+    # must still become its own param instead of being glued to the previous value
+    _, inter = _fixture_events()
+    assert inter["params"]["ac"] == "screen_click_button"
+    assert inter["params"]["other_flag"] == "nao"
+
+
+def test_cards_bbox_from_outline_path():
+    sv, inter = _fixture_events()
+    assert sv["bbox"] == {"_bbox_x1": 100.0, "_bbox_y1": 100.0, "_bbox_x2": 775.0, "_bbox_y2": 540.0}
+    assert inter["bbox"] == {"_bbox_x1": 1000.0, "_bbox_y1": 100.0, "_bbox_x2": 1400.0, "_bbox_y2": 700.0}
+
+
+def test_cards_invalid_xml_raises_value_error():
+    with pytest.raises(ValueError):
+        extract_cards_5_0(b"not an svg")
+
+
+def test_card_params_continuation_paragraph_appends_to_previous_field():
+    p = card_params(["event_detail = ", "visualizacao_erro", "status_journey: erro"])
+    assert p == {"event_detail": "visualizacao_erro", "status_journey": "erro"}
+
+
+def test_path_bbox_relative_commands():
+    assert _path_bbox("M10,20h30v40h-30z") == (10.0, 20.0, 40.0, 60.0)
+    assert _path_bbox("") is None
+
+
+def test_endpoint_uses_structural_reader():
+    import io
+    with open(FIXTURE_SVG, "rb") as f:
+        data = {"file": (io.BytesIO(f.read()), "map.svg")}
+    r = _endpoint_client().post("/api/extract-5.0", data=data, content_type="multipart/form-data")
+    body = r.get_json()
+    assert r.status_code == 200 and body["ok"] is True
+    assert [e["event_type"] for e in body["events"]] == ["screen_view", "interaction"]

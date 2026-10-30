@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 3000 2000">
+<!-- Whimsical-style export: each shape is <g> with an outline <path> + <g class="content"> -->
+<g>
+  <!-- badge L7 sitting on the screen_view card's top edge -->
+  <g><g><g><path d="M330,90c0,20 -16,38 -36,38c-20,0 -36,-18 -36,-38c0,-20 16,-38 36,-38c20,0 36,18 36,38z" data-fill="bg/yellow"></path><g class="content"><g><g><g><g><text><tspan x="280" y="96">L7</tspan></text></g></g></g></g></g></g></g></g>
+  <!-- screen_view card -->
+  <g><g><g><path d="M103,100h669c1.6,0 3,1.3 3,3v434c0,1.6 -1.3,3 -3,3h-669c-1.6,0 -3,-1.3 -3,-3v-434c0,-1.6 1.3,-3 3,-3z" data-fill="fill-outline/blue"></path><g class="content">
+    <g><g><g><g><text><tspan x="300" y="120">event: screen_view</tspan></text></g></g></g></g>
+    <g><g><g><g><text><tspan x="120" y="144">screenName: /hub-de-pagamentos/adicionar-cartao</tspan></text></g></g></g></g>
+    <g><g><g><g><text><tspan x="120" y="168">department: comercial</tspan></text></g></g></g></g>
+    <g><g><g><g><text><tspan x="120" y="192">macro_journey: </tspan></text></g></g><g><g><text><tspan x="120" y="216">[jornada_de_origem]</tspan></text></g></g></g></g>
+    <g><g><g><g><text><tspan x="120" y="240">crmName: [siebel|next]</tspan></text></g></g></g></g>
+    <g><g><g><g><text><tspan x="120" y="264">journeyVariant: [jornadaDeOrigem] </tspan></text></g><g id="x"><g><text><tspan x="400" y="264" font-weight="bold">*VERIFICAR*</tspan></text></g></g></g></g></g>
+  </g></g></g></g>
+  <!-- interaction card: legacy name:, a value soft-wrapped across runs/lines, an unknown field -->
+  <g><g><g><path d="M1000,100h400v600h-400z" data-fill="fill-outline/red"></path><g class="content">
+    <g><g><g><g><text><tspan x="1010" y="120">name: interaction</tspan></text></g></g></g></g>
+    <g><g><g><g><text><tspan x="1010" y="144">sn: /</tspan></text></g><g><g><text><tspan x="1040" y="144" font-weight="bold">[napp ou easy]</tspan></text></g></g><g><text><tspan x="1150" y="144">/hub-payment/insert-card-</tspan></text></g></g><g><g><text><tspan x="1010" y="168">data/failed-invalid-card-error</tspan></text></g></g></g></g>
+    <g><g><g><g><text><tspan x="1010" y="192">lb: [tipo de erro]&amp;[blocker ou </tspan></text></g></g><g><g><text><tspan x="1010" y="216">nonBlocker]&amp;cartaoInvalido</tspan></text></g></g></g></g>
+    <g><g><g><g><text><tspan x="1010" y="240">department = comercial</tspan></text></g></g></g></g>
+    <g><g><g><g><text><tspan x="1010" y="264">status_journey = erro</tspan></text></g></g></g></g>
+    <g><g><g><g><text><tspan x="1010" y="288">custom_flag: sim</tspan></text></g></g></g></g>
+    <g><g><g><g><text><tspan x="1010" y="312">ac: screen_click_button</tspan></text></g><g><g><text><tspan x="1200" y="312">
+</tspan></text></g></g></g><g><g><text><tspan x="1010" y="336">other_flag: nao</tspan></text></g></g></g></g>
+  </g></g></g></g>
+  <!-- annotation note mentioning a single taxonomy field: not an event -->
+  <g><g><g><path d="M2000,100h300v100h-300z" data-fill="bg/white"></path><g class="content">
+    <g><g><g><g><text><tspan x="2010" y="120">exemplo de retorno do macro_journey:</tspan></text></g></g></g></g>
+    <g><g><g><g><text><tspan x="2010" y="144">macro_journey: pagamento_da_fatura</tspan></text></g></g></g></g>
+  </g></g></g></g>
+  <!-- legend/template card: every value is a placeholder and there is no badge -->
+  <g><g><g><path d="M2000,1000h400v300h-400z" data-fill="fill-outline/blue"></path><g class="content">
+    <g><g><g><g><text><tspan x="2010" y="1020">event: screen_view</tspan></text></g></g></g></g>
+    <g><g><g><g><text><tspan x="2010" y="1044">screenName: /[nome da jornada]/[nome da tela]</tspan></text></g></g></g></g>
+    <g><g><g><g><text><tspan x="2010" y="1068">department: [financeiro|comercial|suporte]</tspan></text></g></g></g></g>
+  </g></g></g></g>
+</g>
+</svg>
