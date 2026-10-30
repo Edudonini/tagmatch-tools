@@ -1,0 +1,7 @@
+# Takes precedence over .gitignore for `vercel` uploads: the gitignored
+# vendor/*.whl must ship, local data/envs must not.
+/data
+/.venv
+/node_modules
+/.next
+__pycache__

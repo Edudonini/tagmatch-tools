@@ -47,3 +47,7 @@ __pycache__/
 
 # subagent-driven-development scratch (briefs, reports, diffs, ledger)
 .superpowers/
+
+# vendored private tagmatch wheel: built locally (scripts/build-tagmatch-wheel.sh), shipped
+# with `vercel --prod`, never committed (this repo is public, TagMatch is private)
+/vendor/*.whl

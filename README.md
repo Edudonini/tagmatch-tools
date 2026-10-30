@@ -15,13 +15,13 @@ https://tagmatch-tools.vercel.app
 
 ### Prerequisites
 
-`tagmatch` (the core extraction library) lives in a **private** repo (`Edudonini/TagMatch`). You need a GitHub Personal Access Token with read access to it, configured via `~/.netrc`:
+`tagmatch` (the core extraction library) lives in a **private** repo (`Edudonini/TagMatch`), while this repo is public. `requirements.txt` installs it from a wheel in `vendor/` that is built locally and **never committed** (`/vendor/*.whl` is gitignored); `vendor/TAGMATCH_COMMIT` records the pinned TagMatch commit. Before the first `pip install`, and whenever the pin moves, build it from a local clone of TagMatch:
 
+```bash
+scripts/build-tagmatch-wheel.sh "$(cat vendor/TAGMATCH_COMMIT)" [path-to-TagMatch-clone]   # default clone: ../TagMatch
 ```
-machine github.com
-login x-access-token
-password <your-PAT>
-```
+
+To move the pin, run the script with the new commit and commit the updated `vendor/TAGMATCH_COMMIT`.
 
 ### Local development
 
@@ -50,4 +50,4 @@ python -m pytest api/tests/ -v
 
 ### Deployment
 
-Deployed via `vercel --prod`. Production needs the same private-repo credential as local dev, provided via Vercel Environment Variables (Production + Preview scopes): `GIT_CONFIG_COUNT=1`, `GIT_CONFIG_KEY_0` (contains the PAT, marked Sensitive), `GIT_CONFIG_VALUE_0` — this rewrites `https://github.com/...` git URLs to include the credential during the build only.
+Deployed via `vercel --prod` from a working copy that has the wheel built (see Prerequisites). The CLI uploads the gitignored wheel with the deployment and the build installs `tagmatch` from it, so no private-repo credential is needed (the old `GIT_CONFIG_*` PAT variables are no longer used).
